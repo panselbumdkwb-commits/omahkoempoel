@@ -1,8 +1,17 @@
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import PosClient from "./PosClient";
 
 export default async function PosPage() {
   const supabase = createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const [{ data: products }, { data: tables }, { data: paymentMethods }, { data: business }] =
     await Promise.all([
