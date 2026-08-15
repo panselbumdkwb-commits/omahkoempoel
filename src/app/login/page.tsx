@@ -16,14 +16,24 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
 
-    setLoading(false);
-    if (error) {
+    if (loginError) {
+      setLoading(false);
       setError("Login gagal: email atau password salah.");
       return;
     }
-    router.push("/pos");
+
+    // Arahkan berdasarkan role: Owner/Super Admin ke Dashboard,
+    // Kasir/Front Serve ke interface transaksi (/pos).
+    const { data: role } = await supabase.rpc("fn_current_role_code");
+    setLoading(false);
+
+    if (role === "OWNER" || role === "SUPER_ADMIN") {
+      router.push("/admin");
+    } else {
+      router.push("/pos");
+    }
     router.refresh();
   }
 
