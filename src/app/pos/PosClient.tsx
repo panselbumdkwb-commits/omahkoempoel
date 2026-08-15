@@ -13,7 +13,7 @@ type Product = {
   name: string;
   price: number;
   category_id: string | null;
-  categories: { name: string } | null;
+  categories: { name: string }[] | null;
 };
 type TableRow = { id: string; number: string; status: string };
 type PaymentMethod = { id: string; code: string; name: string };
@@ -129,7 +129,7 @@ export default function PosClient({
             onClick={() => addToCart(p)}
             className="rounded-md border border-border bg-surface dark:bg-surface-dark dark:border-border p-3 text-left hover:border-primary transition"
           >
-            <div className="text-xs text-text-muted">{p.categories?.name ?? "-"}</div>
+            <div className="text-xs text-text-muted">{p.categories?.[0]?.name ?? "-"}</div>
             <div className="font-semibold">{p.name}</div>
             <div className="text-primary font-semibold">Rp {p.price.toLocaleString("id-ID")}</div>
           </button>
