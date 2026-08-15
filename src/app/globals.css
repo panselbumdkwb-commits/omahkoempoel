@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,3 +12,29 @@
     font-family: "Fraunces", serif;
   }
 }
+
+@layer utilities {
+  /* Tekstur kayu jati — dibangun dari layer gradient, bukan foto,
+     supaya ringan dan konsisten di semua perangkat/touchscreen. */
+  .bg-wood-grain {
+    background-color: #3e2723;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.12) 0px,
+        rgba(0, 0, 0, 0.12) 1px,
+        transparent 1px,
+        transparent 7px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(201, 161, 90, 0.05) 0px,
+        rgba(201, 161, 90, 0.05) 2px,
+        transparent 2px,
+        transparent 40px
+      ),
+      radial-gradient(ellipse at top, rgba(141, 106, 66, 0.35), transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(0, 0, 0, 0.45), transparent 70%);
+  }
+}
+
