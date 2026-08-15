@@ -45,3 +45,15 @@ export async function toggleProductStatusAction(id: string, currentStatus: strin
   revalidatePath("/admin/menu");
   revalidatePath("/");
 }
+
+export async function uploadProductImageAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const file = formData.get("file") as File | null;
+
+  if (!productId) throw new Error("ID produk tidak valid.");
+  if (!file || file.size === 0) throw new Error("Silakan pilih file foto terlebih dahulu.");
+
+  await catalogService.uploadProductImage(productId, file);
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+}

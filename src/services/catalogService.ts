@@ -8,6 +8,7 @@ export type ProductInput = {
   description?: string;
   price: number;
   prepTimeMinutes?: number;
+  imageUrl?: string;
 };
 
 /** Semua fungsi di sini memakai session client (bukan admin) sehingga
@@ -25,7 +26,7 @@ export async function listCatalog() {
 
   const { data: products, error: prodError } = await supabase
     .from("products")
-    .select("id, category_id, sku, name, description, price, status")
+    .select("id, category_id, sku, name, description, price, status, image_url")
     .order("name");
   if (prodError) throw new Error(`Gagal memuat produk: ${prodError.message}`);
 
@@ -58,13 +59,20 @@ export async function createProduct(input: ProductInput) {
     description: input.description ?? null,
     price: input.price,
     prep_time_minutes: input.prepTimeMinutes ?? null,
+    image_url: input.imageUrl ?? null,
   });
   if (error) throw new Error(`Gagal menambah produk: ${error.message}`);
 }
 
 export async function updateProduct(
   id: string,
-  updates: Partial<{ name: string; description: string; price: number; categoryId: string }>
+  updates: Partial<{
+    name: string;
+    description: string;
+    price: number;
+    categoryId: string;
+    imageUrl: string;
+  }>
 ) {
   const supabase = createSupabaseServerClient();
   if (updates.price !== undefined && updates.price < 0) {
@@ -78,6 +86,7 @@ export async function updateProduct(
       ...(updates.description !== undefined && { description: updates.description }),
       ...(updates.price !== undefined && { price: updates.price }),
       ...(updates.categoryId !== undefined && { category_id: updates.categoryId }),
+      ...(updates.imageUrl !== undefined && { image_url: updates.imageUrl }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -92,4 +101,41 @@ export async function setProductStatus(id: string, status: "active" | "inactive"
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("products").update({ status }).eq("id", id);
   if (error) throw new Error(`Gagal mengubah status produk: ${error.message}`);
+}
+
+/**
+ * Upload foto produk ke Supabase Storage (bucket "products") dan simpan
+ * URL publiknya ke kolom products.image_url. Memakai session client
+ * (bukan admin) supaya storage policy "products_bucket_admin_insert"
+ * benar-benar menguji role user yang login — bukan bypass.
+ */
+export async function uploadProductImage(productId: string, file: File) {
+  const supabase = createSupabaseServerClient();
+
+  const maxSizeBytes = 3 * 1024 * 1024; // 3MB, cukup untuk foto menu
+  if (file.size > maxSizeBytes) {
+    throw new Error("Ukuran foto maksimal 3MB.");
+  }
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File harus berupa gambar.");
+  }
+
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${productId}/${Date.now()}.${ext}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const { error: uploadError } = await supabase.storage
+    .from("products")
+    .upload(path, arrayBuffer, { contentType: file.type, upsert: true });
+  if (uploadError) throw new Error(`Gagal upload foto: ${uploadError.message}`);
+
+  const { data: publicUrlData } = supabase.storage.from("products").getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("products")
+    .update({ image_url: publicUrlData.publicUrl })
+    .eq("id", productId);
+  if (updateError) throw new Error(`Gagal menyimpan foto produk: ${updateError.message}`);
+
+  return publicUrlData.publicUrl;
 }

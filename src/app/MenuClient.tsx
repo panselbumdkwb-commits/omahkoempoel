@@ -195,8 +195,16 @@ export default function MenuClient({
             onClick={() => openProduct(product)}
             className="text-left bg-parchment rounded-xl p-4 shadow-lg active:scale-95 transition-transform border border-batik-gold/30"
           >
-            <div className="w-full aspect-square rounded-lg bg-wood-light/30 mb-3 flex items-center justify-center text-3xl">
-              🍽️
+            <div className="w-full aspect-square rounded-lg bg-wood-light/30 mb-3 flex items-center justify-center text-3xl overflow-hidden">
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                "🍽️"
+              )}
             </div>
             <h3 className="font-jakarta font-semibold text-wood-dark leading-snug">{product.name}</h3>
             {product.description && (

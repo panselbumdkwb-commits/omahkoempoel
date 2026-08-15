@@ -6,6 +6,7 @@ import {
   createProductAction,
   updateProductAction,
   toggleProductStatusAction,
+  uploadProductImageAction,
 } from "./actions";
 
 type Category = { id: string; name: string; sort_order: number };
@@ -17,6 +18,7 @@ type Product = {
   description: string | null;
   price: number;
   status: string;
+  image_url: string | null;
 };
 
 export default function MenuManagerClient({
@@ -141,18 +143,51 @@ export default function MenuManagerClient({
                   </div>
                 </form>
               ) : (
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">
-                      {p.name}{" "}
-                      <span className="text-xs text-text-muted">({p.sku})</span>
-                      {p.status === "inactive" && (
-                        <span className="ml-2 text-xs text-danger">Nonaktif</span>
-                      )}
-                    </p>
-                    <p className="text-text-muted text-sm">Rp {p.price.toLocaleString("id-ID")}</p>
+                <div className="flex justify-between items-center gap-3">
+                  <div className="flex items-center gap-3">
+                    {p.image_url ? (
+                      <img
+                        src={p.image_url}
+                        alt={p.name}
+                        className="w-14 h-14 rounded-md object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-md border border-dashed border-border flex items-center justify-center text-xl">
+                        🍽️
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold">
+                        {p.name} <span className="text-xs text-text-muted">({p.sku})</span>
+                        {p.status === "inactive" && (
+                          <span className="ml-2 text-xs text-danger">Nonaktif</span>
+                        )}
+                      </p>
+                      <p className="text-text-muted text-sm">Rp {p.price.toLocaleString("id-ID")}</p>
+                      <form
+                        action={(fd) =>
+                          handleAction(() => uploadProductImageAction(fd), `Foto ${p.name} diperbarui.`)
+                        }
+                        className="mt-1 flex items-center gap-2"
+                      >
+                        <input type="hidden" name="productId" value={p.id} />
+                        <input
+                          type="file"
+                          name="file"
+                          accept="image/*"
+                          className="text-xs"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isPending}
+                          className="text-xs px-2 py-1 rounded-md border border-border disabled:opacity-50"
+                        >
+                          Upload Foto
+                        </button>
+                      </form>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => setEditingId(p.id)}
                       className="text-sm px-3 py-1.5 rounded-md border border-border"
