@@ -4,6 +4,19 @@ import { revalidatePath } from "next/cache";
 import * as orderService from "@/services/orderService";
 import * as paymentService from "@/services/paymentService";
 
+export async function listOpenOrdersAction() {
+  return orderService.listOpenOrders();
+}
+
+export async function getOrderDetailAction(orderId: string) {
+  return orderService.getOrderDetail(orderId);
+}
+
+export async function updateCustomerNameAction(orderId: string, customerName: string) {
+  await orderService.updateCustomerName(orderId, customerName);
+  revalidatePath("/pos");
+}
+
 export async function createOrderAction(input: orderService.CreateOrderInput) {
   const order = await orderService.createOrder(input);
   revalidatePath("/pos");

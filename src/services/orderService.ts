@@ -124,7 +124,56 @@ async function recalculateOrderTotals(orderId: string) {
   if (updateError) throw new Error(`Gagal update total order: ${updateError.message}`);
 }
 
-/** Update status order (NEW -> CONFIRMED -> PROCESSING -> READY -> SERVED). */
+/**
+ * Daftar order yang masih perlu diproses kasir (belum CLOSED) — dari
+ * kanal manapun (digital menu publik, kasir manual, dll). Ini adalah
+ * data utama yang ditampilkan di halaman /pos sebagai "Order Masuk".
+ */
+export async function listOpenOrders() {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, order_number, order_type, status, grand_total, customer_name, created_at, tables(number)"
+    )
+    .neq("status", "CLOSED")
+    .neq("status", "VOID")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`Gagal memuat daftar order: ${error.message}`);
+  return data ?? [];
+}
+
+/** Detail lengkap 1 order (item, modifier, meja) untuk ditampilkan
+ * saat kasir membuka sebuah order dari daftar order masuk. */
+export async function getOrderDetail(orderId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, order_number, order_type, status, subtotal, grand_total, customer_name, tables(number)")
+    .eq("id", orderId)
+    .single();
+  if (orderError) throw new Error(`Order tidak ditemukan: ${orderError.message}`);
+
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("id, quantity, unit_price, notes, products(name), order_item_modifiers(name, price_adjustment)")
+    .eq("order_id", orderId);
+  if (itemsError) throw new Error(`Gagal memuat item order: ${itemsError.message}`);
+
+  return { order, items: items ?? [] };
+}
+
+/** Kasir mengisi/mengoreksi nama pelanggan untuk sebuah order. */
+export async function updateCustomerName(orderId: string, customerName: string) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ customer_name: customerName })
+    .eq("id", orderId);
+  if (error) throw new Error(`Gagal menyimpan nama pelanggan: ${error.message}`);
+}
+
+
 export async function updateOrderStatus(
   orderId: string,
   status: "CONFIRMED" | "PROCESSING" | "READY" | "SERVED"

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import PosClient from "./PosClient";
+import * as orderService from "@/services/orderService";
+import PosTopBar from "./PosTopBar";
+import OrderQueueClient from "./OrderQueueClient";
 
 export default async function PosPage() {
   const supabase = createSupabaseServerClient();
@@ -13,8 +15,9 @@ export default async function PosPage() {
     redirect("/login");
   }
 
-  const [{ data: products }, { data: tables }, { data: paymentMethods }, { data: business }] =
+  const [openOrders, { data: products }, { data: tables }, { data: paymentMethods }, { data: business }] =
     await Promise.all([
+      orderService.listOpenOrders(),
       supabase
         .from("products")
         .select("id, name, price, category_id, categories(name)")
@@ -26,11 +29,15 @@ export default async function PosPage() {
     ]);
 
   return (
-    <PosClient
-      businessId={business?.id ?? ""}
-      products={products ?? []}
-      tables={tables ?? []}
-      paymentMethods={paymentMethods ?? []}
-    />
+    <div className="min-h-screen bg-background dark:bg-background-dark">
+      <PosTopBar />
+      <OrderQueueClient
+        initialOrders={openOrders}
+        businessId={business?.id ?? ""}
+        products={products ?? []}
+        tables={tables ?? []}
+        paymentMethods={paymentMethods ?? []}
+      />
+    </div>
   );
 }
