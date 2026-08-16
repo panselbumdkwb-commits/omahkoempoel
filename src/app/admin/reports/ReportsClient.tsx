@@ -48,9 +48,15 @@ function toCSV(report: SalesReport): string {
   lines.push(`Order Terbayar,${report.paidOrdersCount}`);
   lines.push(`Rata-rata Order,${report.averageOrderValue}`);
   lines.push("");
-  lines.push("Breakdown Pembayaran");
-  lines.push("Metode,Jumlah");
-  report.paymentBreakdown.forEach((p) => lines.push(`${p.name},${p.amount}`));
+  lines.push("Rekap per Metode Pembayaran");
+  lines.push("Metode,Jumlah Transaksi,Total");
+  report.paymentBreakdown.forEach((p) => lines.push(`${p.name},${p.count},${p.amount}`));
+  lines.push("");
+  lines.push("Daftar Transaksi Pembayaran");
+  lines.push("Order,Metode,Waktu,Referensi,Jumlah");
+  report.paymentTransactions.forEach((t) =>
+    lines.push(`${t.orderNumber},${t.methodName},${t.paidAt},${t.referenceNo ?? ""},${t.amount}`)
+  );
   lines.push("");
   lines.push("Produk Terlaris");
   lines.push("Nama,Qty,Revenue");
@@ -73,6 +79,7 @@ export default function ReportsClient({
 }) {
   const [report, setReport] = useState<SalesReport>(initialReport);
   const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
+  const [methodFilter, setMethodFilter] = useState<string>("all");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -173,20 +180,80 @@ export default function ReportsClient({
 
       {/* PAYMENT BREAKDOWN */}
       <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
-        <h3 className="font-heading text-lg text-primary mb-4">Breakdown Pembayaran</h3>
+        <h3 className="font-heading text-lg text-primary mb-4">Rekap per Metode Pembayaran</h3>
         {report.paymentBreakdown.length === 0 ? (
           <p className="text-sm text-text-muted">Belum ada pembayaran pada periode ini.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mb-4">
+            <thead>
+              <tr className="text-text-muted text-left">
+                <th className="pb-2">Metode</th>
+                <th className="pb-2 text-right">Jumlah Transaksi</th>
+                <th className="pb-2 text-right">Total</th>
+              </tr>
+            </thead>
             <tbody>
               {report.paymentBreakdown.map((p) => (
-                <tr key={p.name} className="border-b border-border">
+                <tr
+                  key={p.name}
+                  className={`border-t border-border cursor-pointer ${methodFilter === p.name ? "bg-background dark:bg-background-dark" : ""}`}
+                  onClick={() => setMethodFilter(methodFilter === p.name ? "all" : p.name)}
+                >
                   <td className="py-2">{p.name}</td>
+                  <td className="py-2 text-right">{p.count}</td>
                   <td className="py-2 text-right font-semibold">{formatRupiah(p.amount)}</td>
                 </tr>
               ))}
+              <tr className="border-t border-border font-bold">
+                <td className="py-2">Total</td>
+                <td className="py-2 text-right">{report.paymentBreakdown.reduce((s, p) => s + p.count, 0)}</td>
+                <td className="py-2 text-right">
+                  {formatRupiah(report.paymentBreakdown.reduce((s, p) => s + p.amount, 0))}
+                </td>
+              </tr>
             </tbody>
           </table>
+        )}
+
+        {report.paymentTransactions.length > 0 && (
+          <>
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-semibold">
+                Daftar Transaksi {methodFilter !== "all" && `— ${methodFilter}`}
+              </p>
+              {methodFilter !== "all" && (
+                <button onClick={() => setMethodFilter("all")} className="text-xs text-primary">
+                  Tampilkan semua
+                </button>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-text-muted text-left sticky top-0 bg-surface dark:bg-surface-dark">
+                    <th className="pb-2">Order</th>
+                    <th className="pb-2">Metode</th>
+                    <th className="pb-2">Waktu</th>
+                    <th className="pb-2">Referensi</th>
+                    <th className="pb-2 text-right">Jumlah</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.paymentTransactions
+                    .filter((t) => methodFilter === "all" || t.methodName === methodFilter)
+                    .map((t, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="py-1.5">{t.orderNumber}</td>
+                        <td className="py-1.5">{t.methodName}</td>
+                        <td className="py-1.5">{new Date(t.paidAt).toLocaleString("id-ID")}</td>
+                        <td className="py-1.5">{t.referenceNo || "-"}</td>
+                        <td className="py-1.5 text-right">{formatRupiah(t.amount)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 

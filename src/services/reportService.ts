@@ -6,10 +6,17 @@ export type SalesReport = {
   ordersCount: number;
   paidOrdersCount: number;
   averageOrderValue: number;
-  paymentBreakdown: { name: string; amount: number }[];
+  paymentBreakdown: { name: string; amount: number; count: number }[];
   dailyTrend: { date: string; revenue: number }[];
   topProducts: { name: string; quantity: number; revenue: number }[];
   bottomProducts: { name: string; quantity: number; revenue: number }[];
+  paymentTransactions: {
+    orderNumber: string;
+    methodName: string;
+    amount: number;
+    referenceNo: string | null;
+    paidAt: string;
+  }[];
 };
 
 /**
@@ -48,18 +55,32 @@ export async function getSalesReport(startISO: string, endISO: string): Promise<
 
   const { data: payments, error: paymentsError } = await supabase
     .from("payments")
-    .select("amount, status, paid_at, payment_methods(name)")
+    .select("amount, status, paid_at, reference_no, payment_methods(name), orders(order_number)")
     .eq("status", "COMPLETED")
     .gte("paid_at", startISO)
-    .lt("paid_at", endISO);
+    .lt("paid_at", endISO)
+    .order("paid_at", { ascending: false });
   if (paymentsError) throw new Error(`Gagal memuat pembayaran: ${paymentsError.message}`);
 
-  const paymentMap = new Map<string, number>();
+  const paymentMap = new Map<string, { amount: number; count: number }>();
+  const paymentTransactions: SalesReport["paymentTransactions"] = [];
   for (const p of payments ?? []) {
-    const name = (p as any).payment_methods?.name ?? "Lainnya";
-    paymentMap.set(name, (paymentMap.get(name) ?? 0) + Number(p.amount));
+    const methodName = (p as any).payment_methods?.name ?? "Lainnya";
+    const orderNumber = (p as any).orders?.order_number ?? "-";
+    const existing = paymentMap.get(methodName) ?? { amount: 0, count: 0 };
+    existing.amount += Number(p.amount);
+    existing.count += 1;
+    paymentMap.set(methodName, existing);
+
+    paymentTransactions.push({
+      orderNumber,
+      methodName,
+      amount: Number(p.amount),
+      referenceNo: p.reference_no,
+      paidAt: p.paid_at,
+    });
   }
-  const paymentBreakdown = Array.from(paymentMap.entries()).map(([name, amount]) => ({ name, amount }));
+  const paymentBreakdown = Array.from(paymentMap.entries()).map(([name, v]) => ({ name, ...v }));
 
   const orderIds = (orders ?? []).map((o) => o.id);
   let topProducts: SalesReport["topProducts"] = [];
@@ -85,5 +106,5 @@ export async function getSalesReport(startISO: string, endISO: string): Promise<
     bottomProducts = [...allProducts].sort((a, b) => a.quantity - b.quantity).slice(0, 5);
   }
 
-  return { revenue, ordersCount, paidOrdersCount, averageOrderValue, paymentBreakdown, dailyTrend, topProducts, bottomProducts };
+  return { revenue, ordersCount, paidOrdersCount, averageOrderValue, paymentBreakdown, dailyTrend, topProducts, bottomProducts, paymentTransactions };
 }
