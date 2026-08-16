@@ -76,6 +76,15 @@ export default function LoginPage() {
         >
           {loading ? "Memproses..." : "Login"}
         </button>
+
+        <div className="mt-6 pt-4 border-t border-border text-center">
+          <a
+            href="/kiosk/attendance"
+            className="text-sm text-primary underline font-semibold"
+          >
+            Absen Pegawai (tanpa perlu login)
+          </a>
+        </div>
       </form>
     </main>
   );

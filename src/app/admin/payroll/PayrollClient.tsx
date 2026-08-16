@@ -136,7 +136,16 @@ export default function PayrollClient({ components, periods }: { components: Com
       </section>
 
       {selectedPeriod && items && (
-        <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
+        <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:border-0 print:bg-white print:p-0">
+          {/* CSS khusus printer thermal (lebar 80mm) — sama seperti nota/
+              tiket dapur di /print, hanya berlaku saat benar-benar mencetak. */}
+          <style>{`
+            @media print {
+              @page { size: 80mm auto; margin: 3mm; }
+              body { width: 80mm; background: white; }
+            }
+          `}</style>
+
           <div className="flex justify-between items-center mb-4 print:hidden">
             <h2 className="font-heading text-xl text-primary">Slip Gaji</h2>
             <div className="flex gap-2">
@@ -147,47 +156,68 @@ export default function PayrollClient({ components, periods }: { components: Com
                 Approve Periode
               </button>
               <button onClick={() => window.print()} className="text-sm px-3 py-1.5 rounded-md border border-border">
-                Print
+                🖨️ Cetak (80mm Thermal)
               </button>
             </div>
           </div>
 
-          <div className="space-y-6">
-            {items.map((item: any) => (
-              <div key={item.id} className="border border-border rounded-md p-4 break-inside-avoid">
-                <p className="font-semibold mb-2">
-                  {item.employees?.full_name} ({item.employees?.employee_code})
-                </p>
-                <table className="w-full text-sm mb-2">
-                  <tbody>
-                    <tr>
-                      <td className="py-1">Gaji Pokok</td>
-                      <td className="py-1 text-right">{formatRupiah(item.basic_salary)}</td>
-                    </tr>
-                    {item.earnings_breakdown.map((e: any, i: number) => (
-                      <tr key={i}>
-                        <td className="py-1 text-success">+ {e.name}</td>
-                        <td className="py-1 text-right text-success">{formatRupiah(e.amount)}</td>
+          <div className="space-y-6 print:space-y-0">
+            {items.map((item: any, idx: number) => {
+              const period = periods.find((p) => p.id === selectedPeriod);
+              const isLast = idx === items.length - 1;
+              return (
+                <div
+                  key={item.id}
+                  className={`border border-border rounded-md p-4 break-inside-avoid print:border-0 print:rounded-none print:w-[72mm] print:mx-auto print:p-2 print:font-mono print:text-xs print:leading-tight ${
+                    isLast ? "" : "print:break-after-page"
+                  }`}
+                >
+                  <p className="text-center font-bold print:text-sm">OMAH KOEMPOEL</p>
+                  <p className="text-center text-text-muted print:text-[10px] print:mb-2">Slip Gaji Karyawan</p>
+                  {period && (
+                    <p className="text-center text-xs text-text-muted print:text-[10px] print:mb-2">
+                      Periode {period.period_start} s/d {period.period_end}
+                    </p>
+                  )}
+                  <hr className="hidden print:block border-black my-2" />
+
+                  <p className="font-semibold mb-2 print:mb-1 print:font-bold">
+                    {item.employees?.full_name} ({item.employees?.employee_code})
+                  </p>
+                  <table className="w-full text-sm print:text-xs mb-2">
+                    <tbody>
+                      <tr>
+                        <td className="py-1">Gaji Pokok</td>
+                        <td className="py-1 text-right">{formatRupiah(item.basic_salary)}</td>
                       </tr>
-                    ))}
-                    <tr className="border-t border-border font-semibold">
-                      <td className="py-1">Gaji Kotor</td>
-                      <td className="py-1 text-right">{formatRupiah(item.gross_salary)}</td>
-                    </tr>
-                    {item.deductions_breakdown.map((d: any, i: number) => (
-                      <tr key={i}>
-                        <td className="py-1 text-danger">− {d.name}</td>
-                        <td className="py-1 text-right text-danger">{formatRupiah(d.amount)}</td>
+                      {item.earnings_breakdown.map((e: any, i: number) => (
+                        <tr key={i}>
+                          <td className="py-1 text-success print:text-black">+ {e.name}</td>
+                          <td className="py-1 text-right text-success print:text-black">{formatRupiah(e.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t border-border font-semibold">
+                        <td className="py-1">Gaji Kotor</td>
+                        <td className="py-1 text-right">{formatRupiah(item.gross_salary)}</td>
                       </tr>
-                    ))}
-                    <tr className="border-t border-border font-bold text-primary">
-                      <td className="py-1">Take Home Pay</td>
-                      <td className="py-1 text-right">{formatRupiah(item.net_salary)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ))}
+                      {item.deductions_breakdown.map((d: any, i: number) => (
+                        <tr key={i}>
+                          <td className="py-1 text-danger print:text-black">− {d.name}</td>
+                          <td className="py-1 text-right text-danger print:text-black">{formatRupiah(d.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t border-border font-bold text-primary print:text-black">
+                        <td className="py-1">Take Home Pay</td>
+                        <td className="py-1 text-right">{formatRupiah(item.net_salary)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="hidden print:block text-center text-[10px] mt-2">
+                    Dicetak: {new Date().toLocaleString("id-ID")}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

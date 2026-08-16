@@ -8,6 +8,10 @@ export async function listOpenOrdersAction() {
   return orderService.listOpenOrders();
 }
 
+export async function listClosedOrdersAction(params?: { from?: string; to?: string }) {
+  return orderService.listClosedOrders(params);
+}
+
 export async function getOrderDetailAction(orderId: string) {
   return orderService.getOrderDetail(orderId);
 }

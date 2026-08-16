@@ -11,9 +11,9 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
 
   return (
     <>
-      <div className="max-w-sm mx-auto p-6 font-mono text-sm">
-        <h1 className="text-center font-bold text-lg">OMAH KOEMPOEL</h1>
-        <p className="text-center text-xs mb-4">Ngumpul · Ngopi · Nikmati</p>
+      <div className="w-[72mm] mx-auto p-2 font-mono text-xs leading-tight">
+        <h1 className="text-center font-bold text-sm">OMAH KOEMPOEL</h1>
+        <p className="text-center text-[10px] mb-3">Ngumpul · Ngopi · Nikmati</p>
         <hr className="border-black mb-2" />
         <p>No. Transaksi: {order.order_number}</p>
         <p>Tanggal: {new Date().toLocaleString("id-ID")}</p>
@@ -21,16 +21,16 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
         {order.customer_name && <p>Pelanggan: {order.customer_name}</p>}
         <hr className="border-black my-2" />
         {items.map((item: any) => (
-          <div key={item.id} className="flex justify-between mb-1">
-            <span>
+          <div key={item.id} className="flex justify-between gap-2 mb-1">
+            <span className="break-words">
               {item.quantity}x {item.products?.name}
               {item.order_item_modifiers?.length > 0 && (
-                <span className="block text-xs pl-3">
+                <span className="block text-[10px] pl-3">
                   {item.order_item_modifiers.map((m: any) => m.name).join(", ")}
                 </span>
               )}
             </span>
-            <span>{formatRupiah(item.quantity * Number(item.unit_price))}</span>
+            <span className="shrink-0">{formatRupiah(item.quantity * Number(item.unit_price))}</span>
           </div>
         ))}
         <hr className="border-black my-2" />
@@ -51,12 +51,12 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
           <span>Rp 0</span>
         </div>
         <hr className="border-black my-2" />
-        <div className="flex justify-between font-bold text-base">
+        <div className="flex justify-between font-bold text-sm">
           <span>TOTAL</span>
           <span>{formatRupiah(Number(order.grand_total))}</span>
         </div>
-        <p className="text-center text-xs mt-4">*Pajak belum dikonfigurasi di sistem.</p>
-        <p className="text-center mt-4">Terima kasih atas kunjungan Anda 🙏</p>
+        <p className="text-center text-[10px] mt-4">*Pajak belum dikonfigurasi di sistem.</p>
+        <p className="text-center text-[10px] mt-4">Terima kasih atas kunjungan Anda 🙏</p>
       </div>
       <PrintButton />
     </>

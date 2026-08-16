@@ -8,3 +8,7 @@ export async function submitPublicOrderAction(input: publicOrderService.SubmitPu
   revalidatePath("/");
   return result;
 }
+
+export async function getPublicOrderStatusAction(orderId: string) {
+  return publicOrderService.getPublicOrderStatus(orderId);
+}

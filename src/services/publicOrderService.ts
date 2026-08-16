@@ -140,3 +140,21 @@ export async function submitPublicOrder(input: SubmitPublicOrderInput) {
 
   return { orderId: order.id, orderNumber: order.order_number, grandTotal: subtotal };
 }
+
+/**
+ * Status pesanan untuk dilihat pembeli (perangkat sendiri, tanpa login).
+ * Dipanggil dari halaman /status/[orderId]. Sengaja HANYA mengembalikan
+ * field yang aman ditampilkan ke publik (tidak ada customer_name, tidak
+ * ada data order lain) — orderId adalah UUID yang tidak bisa ditebak,
+ * jadi ini bukan celah untuk mengintip pesanan orang lain selama ID
+ * tidak dibagikan sendiri oleh pembelinya.
+ */
+export async function getPublicOrderStatus(orderId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .select("order_number, status, grand_total, created_at")
+    .eq("id", orderId)
+    .single();
+  if (error || !data) throw new Error("Pesanan tidak ditemukan.");
+  return data;
+}

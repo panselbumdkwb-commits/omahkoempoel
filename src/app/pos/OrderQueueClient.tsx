@@ -8,6 +8,7 @@ import {
   processPaymentAction,
   closeOrderAction,
   sendToKitchenAction,
+  listClosedOrdersAction,
 } from "./actions";
 import PosClient from "./PosClient";
 
@@ -33,6 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
   READY: "Siap Disajikan",
   SERVED: "Sudah Disajikan",
   PAID: "Sudah Bayar",
+  CLOSED: "Selesai",
 };
 
 function tableLabel(order: OpenOrder) {
@@ -63,6 +65,18 @@ export default function OrderQueueClient({
   const [orders] = useState<OpenOrder[]>(initialOrders);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [activeTab, setActiveTab] = useState<"masuk" | "riwayat">("masuk");
+  const [closedOrders, setClosedOrders] = useState<OpenOrder[] | null>(null);
+  const [loadingClosed, setLoadingClosed] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "riwayat" && closedOrders === null) {
+      setLoadingClosed(true);
+      listClosedOrdersAction()
+        .then((data) => setClosedOrders(data as OpenOrder[]))
+        .finally(() => setLoadingClosed(false));
+    }
+  }, [activeTab, closedOrders]);
 
   if (showNewOrder) {
     return (
@@ -85,26 +99,61 @@ export default function OrderQueueClient({
     );
   }
 
+  const listToShow = activeTab === "masuk" ? orders : closedOrders ?? [];
+
   return (
     <div className="max-w-3xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-heading text-xl text-primary">Order Masuk</h2>
+        <h2 className="font-heading text-xl text-primary">
+          {activeTab === "masuk" ? "Order Masuk" : "Riwayat Transaksi (Hari Ini)"}
+        </h2>
+        {activeTab === "masuk" && (
+          <button
+            onClick={() => setShowNewOrder(true)}
+            className="bg-primary text-white px-4 py-2 rounded-md text-sm font-semibold"
+          >
+            + Buat Order Baru
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2 mb-4 border-b border-border">
         <button
-          onClick={() => setShowNewOrder(true)}
-          className="bg-primary text-white px-4 py-2 rounded-md text-sm font-semibold"
+          onClick={() => setActiveTab("masuk")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px ${
+            activeTab === "masuk" ? "border-primary text-primary" : "border-transparent text-text-muted"
+          }`}
         >
-          + Buat Order Baru
+          Order Masuk
+        </button>
+        <button
+          onClick={() => setActiveTab("riwayat")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px ${
+            activeTab === "riwayat" ? "border-primary text-primary" : "border-transparent text-text-muted"
+          }`}
+        >
+          Riwayat Transaksi
         </button>
       </div>
 
-      {orders.length === 0 && (
+      {activeTab === "riwayat" && loadingClosed && (
+        <p className="text-text-muted text-sm py-6 text-center">Memuat riwayat transaksi...</p>
+      )}
+
+      {activeTab === "masuk" && orders.length === 0 && (
         <p className="text-text-muted text-sm py-10 text-center">
           Belum ada order masuk. Order dari pelanggan (lewat menu digital) akan otomatis muncul di sini.
         </p>
       )}
 
+      {activeTab === "riwayat" && !loadingClosed && (closedOrders ?? []).length === 0 && (
+        <p className="text-text-muted text-sm py-10 text-center">
+          Belum ada transaksi yang selesai dibayar hari ini.
+        </p>
+      )}
+
       <div className="space-y-3">
-        {orders.map((order) => (
+        {listToShow.map((order) => (
           <button
             key={order.id}
             onClick={() => setSelectedOrderId(order.id)}
@@ -224,7 +273,17 @@ function OrderDetailModal({
           <p className="p-5 text-sm text-text-muted">Memuat detail order...</p>
         ) : (
           <>
+            {(() => {
+              const isClosed = ["PAID", "CLOSED"].includes(detail.order.status);
+              return (
+                <>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {isClosed && (
+                <p className="text-xs bg-background dark:bg-background-dark border border-border rounded-md p-2 text-text-muted">
+                  Order ini sudah {STATUS_LABEL[detail.order.status] ?? detail.order.status} dan tidak
+                  dapat diubah lagi — data di bawah bersifat lihat saja (rekap).
+                </p>
+              )}
               <p className="text-sm font-semibold">Data Pemesan</p>
               <div>
                 <label className="text-xs block mb-1">Nama Pelanggan</label>
@@ -233,12 +292,13 @@ function OrderDetailModal({
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Nama pelanggan"
-                    className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    disabled={isClosed}
+                    className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark disabled:opacity-60"
                   />
                   <button
                     onClick={saveCustomerName}
-                    disabled={isPending}
-                    className="px-3 rounded-md border border-border text-sm"
+                    disabled={isPending || isClosed}
+                    className="px-3 rounded-md border border-border text-sm disabled:opacity-60"
                   >
                     Simpan
                   </button>
@@ -251,7 +311,8 @@ function OrderDetailModal({
                   <select
                     value={orderType}
                     onChange={(e) => setOrderType(e.target.value as "dine_in" | "take_away")}
-                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                    disabled={isClosed}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm disabled:opacity-60"
                   >
                     <option value="dine_in">Dine In</option>
                     <option value="take_away">Take Away</option>
@@ -260,7 +321,8 @@ function OrderDetailModal({
                     <select
                       value={tableId}
                       onChange={(e) => setTableId(e.target.value)}
-                      className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                      disabled={isClosed}
+                      className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm disabled:opacity-60"
                     >
                       <option value="">Pilih meja</option>
                       {tables.map((t) => (
@@ -272,8 +334,8 @@ function OrderDetailModal({
                   )}
                   <button
                     onClick={saveTableAndType}
-                    disabled={isPending}
-                    className="px-3 rounded-md border border-border text-sm"
+                    disabled={isPending || isClosed}
+                    className="px-3 rounded-md border border-border text-sm disabled:opacity-60"
                   >
                     Simpan
                   </button>
@@ -345,7 +407,7 @@ function OrderDetailModal({
               </div>
             </div>
 
-            {detail.order.status !== "PAID" && (
+            {!isClosed && (
               <div className="p-5 border-t border-border space-y-3">
                 <p className="text-sm font-semibold">3. Pembayaran</p>
                 <select
@@ -375,6 +437,9 @@ function OrderDetailModal({
                 {status && <p className="text-sm text-text-muted">{status}</p>}
               </div>
             )}
+              </>
+              );
+            })()}
           </>
         )}
       </div>

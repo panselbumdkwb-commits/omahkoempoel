@@ -143,6 +143,35 @@ export async function listOpenOrders() {
   return data ?? [];
 }
 
+/**
+ * Riwayat transaksi yang sudah dibayar/ditutup (PAID atau CLOSED),
+ * untuk direkap di akun KASIR — sebelumnya order langsung "hilang"
+ * dari tampilan begitu ditutup karena listOpenOrders() mengecualikan
+ * status ini. Default rentang: hari ini (shift berjalan), berdasarkan
+ * jam lokal Asia/Jakarta.
+ */
+export async function listClosedOrders(params?: { from?: string; to?: string }) {
+  const supabase = createSupabaseServerClient();
+
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const from = params?.from ?? startOfToday.toISOString();
+  const to = params?.to ?? now.toISOString();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, order_number, order_type, status, grand_total, customer_name, created_at, tables(number)"
+    )
+    .in("status", ["PAID", "CLOSED"])
+    .gte("created_at", from)
+    .lte("created_at", to)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`Gagal memuat riwayat transaksi: ${error.message}`);
+  return data ?? [];
+}
+
 /** Detail lengkap 1 order (item, modifier, meja) untuk ditampilkan
  * saat kasir membuka sebuah order dari daftar order masuk. */
 export async function getOrderDetail(orderId: string) {

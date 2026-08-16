@@ -47,9 +47,11 @@ export default function MenuClient({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [pickerProduct, setPickerProduct] = useState<Product | null>(null);
-  const [confirmation, setConfirmation] = useState<{ orderNumber: string; total: number } | null>(
-    null
-  );
+  const [confirmation, setConfirmation] = useState<{
+    orderId: string;
+    orderNumber: string;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -118,7 +120,11 @@ export default function MenuClient({
             modifierIds: l.modifiers.map((m) => m.id),
           })),
         });
-        setConfirmation({ orderNumber: result.orderNumber, total: result.grandTotal });
+        setConfirmation({
+          orderId: result.orderId,
+          orderNumber: result.orderNumber,
+          total: result.grandTotal,
+        });
         setCart([]);
         setCartOpen(false);
       } catch (err: any) {
@@ -185,9 +191,9 @@ export default function MenuClient({
           <button
             key={product.id}
             onClick={() => openProduct(product)}
-            className="text-left bg-parchment rounded-xl p-4 shadow-lg active:scale-95 transition-transform border border-batik-gold/30"
+            className="relative text-left bg-parchment rounded-xl p-4 shadow-lg active:scale-95 transition-transform border border-batik-gold/30"
           >
-            <div className="w-full aspect-square rounded-lg bg-wood-light/30 mb-3 flex items-center justify-center text-3xl overflow-hidden">
+            <div className="w-full aspect-square rounded-lg bg-wood-light/30 mb-3 flex items-center justify-center text-3xl overflow-hidden relative">
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -197,6 +203,9 @@ export default function MenuClient({
               ) : (
                 "🍽️"
               )}
+              <span className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-sogan text-parchment font-jakarta font-bold text-lg flex items-center justify-center shadow-md">
+                +
+              </span>
             </div>
             <h3 className="font-jakarta font-semibold text-wood-dark leading-snug">{product.name}</h3>
             {product.description && (
@@ -214,13 +223,17 @@ export default function MenuClient({
         )}
       </section>
 
-      {/* FLOATING CART BUTTON */}
-      {cartCount > 0 && !cartOpen && (
+      {/* FLOATING CART BUTTON — selalu tampil, termasuk saat keranjang masih kosong,
+          supaya pembeli tahu sejak awal bahwa alur pemesanan ada di sini. */}
+      {!cartOpen && (
         <button
-          onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 right-6 z-30 bg-sogan text-parchment font-jakarta font-bold px-6 py-4 rounded-full shadow-xl flex items-center gap-2"
+          onClick={() => cartCount > 0 && setCartOpen(true)}
+          disabled={cartCount === 0}
+          className="fixed bottom-6 right-6 z-30 bg-sogan text-parchment font-jakarta font-bold px-6 py-4 rounded-full shadow-xl flex items-center gap-2 disabled:opacity-60"
         >
-          🧺 PESAN ({cartCount}) · {formatRupiah(cartTotal)}
+          {cartCount > 0
+            ? `🧺 PESAN (${cartCount}) · ${formatRupiah(cartTotal)}`
+            : "🧺 Keranjang kosong — sentuh menu untuk memesan"}
         </button>
       )}
 
@@ -316,6 +329,12 @@ export default function MenuClient({
               <br />
               Silakan tunjukkan nomor ini ke kasir untuk pembayaran.
             </p>
+            <a
+              href={`/status/${confirmation.orderId}`}
+              className="block w-full bg-batik-gold text-wood-dark font-jakarta font-bold py-3 rounded-md mb-3"
+            >
+              Pantau Status Pesanan
+            </a>
             <button
               onClick={() => setConfirmation(null)}
               className="w-full bg-daun text-parchment font-jakarta font-bold py-3 rounded-md"
