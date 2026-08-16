@@ -10,8 +10,6 @@ export type PublicOrderItemInput = {
 };
 
 export type SubmitPublicOrderInput = {
-  orderType: "dine_in" | "take_away";
-  tableId?: string | null;
   items: PublicOrderItemInput[];
 };
 
@@ -47,17 +45,6 @@ export async function submitPublicOrder(input: SubmitPublicOrderInput) {
     .single();
   if (businessError || !business) throw new Error("Konfigurasi bisnis tidak ditemukan.");
 
-  if (input.orderType === "dine_in") {
-    if (!input.tableId) throw new Error("Nomor meja wajib dipilih untuk Dine In.");
-    const { data: table, error: tableError } = await supabaseAdmin
-      .from("tables")
-      .select("id, status")
-      .eq("id", input.tableId)
-      .eq("business_id", business.id)
-      .single();
-    if (tableError || !table) throw new Error("Meja tidak ditemukan.");
-  }
-
   const { data: orderNumber, error: numberError } = await supabaseAdmin.rpc(
     "fn_next_order_number",
     { p_business_id: business.id }
@@ -69,8 +56,8 @@ export async function submitPublicOrder(input: SubmitPublicOrderInput) {
     .insert({
       business_id: business.id,
       order_number: orderNumber,
-      order_type: input.orderType,
-      table_id: input.orderType === "dine_in" ? input.tableId : null,
+      order_type: "dine_in",
+      table_id: null, // dilengkapi kasir saat memproses order
       status: "NEW",
       created_by: null,
     })

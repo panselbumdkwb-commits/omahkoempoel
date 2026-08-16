@@ -1,12 +1,12 @@
 import * as orderService from "@/services/orderService";
-import AutoPrint from "../../AutoPrint";
+import PrintButton from "../../PrintButton";
 
 export default async function KitchenTicketPage({ params }: { params: { orderId: string } }) {
   const { order, items } = await orderService.getOrderDetail(params.orderId);
   const table = Array.isArray(order.tables) ? order.tables[0] : order.tables;
 
   return (
-    <AutoPrint>
+    <>
       <div className="max-w-sm mx-auto p-6 font-mono text-sm">
         <h1 className="text-center font-bold text-lg mb-1">TIKET DAPUR</h1>
         <p className="text-center mb-4">Omah Mburi</p>
@@ -29,6 +29,7 @@ export default async function KitchenTicketPage({ params }: { params: { orderId:
         <hr className="border-black my-2" />
         <p className="text-center text-xs">{new Date().toLocaleString("id-ID")}</p>
       </div>
-    </AutoPrint>
+      <PrintButton />
+    </>
   );
 }

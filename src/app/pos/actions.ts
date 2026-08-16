@@ -17,6 +17,15 @@ export async function updateCustomerNameAction(orderId: string, customerName: st
   revalidatePath("/pos");
 }
 
+export async function updateOrderTableAction(
+  orderId: string,
+  tableId: string | null,
+  orderType: "dine_in" | "take_away"
+) {
+  await orderService.updateOrderTableAndType(orderId, tableId, orderType);
+  revalidatePath("/pos");
+}
+
 export async function sendToKitchenAction(orderId: string) {
   await orderService.updateOrderStatus(orderId, "CONFIRMED");
   revalidatePath("/pos");

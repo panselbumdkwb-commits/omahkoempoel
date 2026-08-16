@@ -1,5 +1,5 @@
 import * as orderService from "@/services/orderService";
-import AutoPrint from "../../AutoPrint";
+import PrintButton from "../../PrintButton";
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -10,7 +10,7 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
   const table = Array.isArray(order.tables) ? order.tables[0] : order.tables;
 
   return (
-    <AutoPrint>
+    <>
       <div className="max-w-sm mx-auto p-6 font-mono text-sm">
         <h1 className="text-center font-bold text-lg">OMAH KOEMPOEL</h1>
         <p className="text-center text-xs mb-4">Ngumpul · Ngopi · Nikmati</p>
@@ -58,6 +58,7 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
         <p className="text-center text-xs mt-4">*Pajak belum dikonfigurasi di sistem.</p>
         <p className="text-center mt-4">Terima kasih atas kunjungan Anda 🙏</p>
       </div>
-    </AutoPrint>
+      <PrintButton />
+    </>
   );
 }

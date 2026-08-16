@@ -149,7 +149,7 @@ export async function getOrderDetail(orderId: string) {
   const supabase = createSupabaseServerClient();
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("id, order_number, order_type, status, subtotal, grand_total, customer_name, tables(number)")
+    .select("id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, tables(number)")
     .eq("id", orderId)
     .single();
   if (orderError) throw new Error(`Order tidak ditemukan: ${orderError.message}`);
@@ -163,7 +163,22 @@ export async function getOrderDetail(orderId: string) {
   return { order, items: items ?? [] };
 }
 
-/** Kasir mengisi/mengoreksi nama pelanggan untuk sebuah order. */
+/** Kasir melengkapi meja & tipe order untuk pesanan yang masuk tanpa
+ * data ini dari pelanggan (mis. order dari menu digital publik). */
+export async function updateOrderTableAndType(
+  orderId: string,
+  tableId: string | null,
+  orderType: "dine_in" | "take_away"
+) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ table_id: orderType === "dine_in" ? tableId : null, order_type: orderType })
+    .eq("id", orderId);
+  if (error) throw new Error(`Gagal menyimpan meja/tipe order: ${error.message}`);
+}
+
+
 export async function updateCustomerName(orderId: string, customerName: string) {
   const supabase = createSupabaseServerClient();
   const { error } = await supabase

@@ -47,8 +47,6 @@ export default function MenuClient({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [pickerProduct, setPickerProduct] = useState<Product | null>(null);
-  const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
-  const [tableId, setTableId] = useState<string>("");
   const [confirmation, setConfirmation] = useState<{ orderNumber: string; total: number } | null>(
     null
   );
@@ -108,16 +106,10 @@ export default function MenuClient({
 
   function submitOrder() {
     if (cart.length === 0) return;
-    if (orderType === "dine_in" && !tableId) {
-      setError("Silakan pilih nomor meja terlebih dahulu.");
-      return;
-    }
     setError(null);
     startTransition(async () => {
       try {
         const result = await submitPublicOrderAction({
-          orderType,
-          tableId: orderType === "dine_in" ? tableId : null,
           items: cart.map((l) => ({
             productId: l.product.id,
             variantId: l.variant?.id ?? null,
@@ -228,7 +220,7 @@ export default function MenuClient({
           onClick={() => setCartOpen(true)}
           className="fixed bottom-6 right-6 z-30 bg-sogan text-parchment font-jakarta font-bold px-6 py-4 rounded-full shadow-xl flex items-center gap-2"
         >
-          🧺 Keranjang ({cartCount}) · {formatRupiah(cartTotal)}
+          🧺 PESAN ({cartCount}) · {formatRupiah(cartTotal)}
         </button>
       )}
 
@@ -288,45 +280,9 @@ export default function MenuClient({
             </div>
 
             <div className="p-5 border-t border-wood-light/30 space-y-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setOrderType("dine_in")}
-                  className={`flex-1 py-2.5 rounded-md font-jakarta font-semibold border ${
-                    orderType === "dine_in"
-                      ? "bg-daun text-parchment border-daun"
-                      : "text-wood-dark border-wood-light"
-                  }`}
-                >
-                  Dine In
-                </button>
-                <button
-                  onClick={() => setOrderType("take_away")}
-                  className={`flex-1 py-2.5 rounded-md font-jakarta font-semibold border ${
-                    orderType === "take_away"
-                      ? "bg-daun text-parchment border-daun"
-                      : "text-wood-dark border-wood-light"
-                  }`}
-                >
-                  Take Away
-                </button>
-              </div>
-
-              {orderType === "dine_in" && (
-                <select
-                  value={tableId}
-                  onChange={(e) => setTableId(e.target.value)}
-                  className="w-full border border-wood-light rounded-md p-2.5 font-jakarta bg-white"
-                >
-                  <option value="">Pilih nomor meja</option>
-                  {tables
-                    .filter((t) => t.status !== "maintenance")
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        Meja {t.number}
-                      </option>
-                    ))}
-                </select>
-              )}
+              <p className="text-xs text-wood-mid font-jakarta">
+                Nomor meja & nama Anda akan dilengkapi oleh kasir saat memproses pesanan.
+              </p>
 
               <div className="flex justify-between font-jakarta font-bold text-wood-dark text-lg">
                 <span>Total</span>
@@ -340,7 +296,7 @@ export default function MenuClient({
                 disabled={isPending || cart.length === 0}
                 className="w-full bg-sogan text-parchment font-jakarta font-bold py-4 rounded-md disabled:opacity-50"
               >
-                {isPending ? "Mengirim pesanan..." : "Pesan Sekarang"}
+                {isPending ? "Mengirim pesanan..." : "SELESAI"}
               </button>
             </div>
           </div>

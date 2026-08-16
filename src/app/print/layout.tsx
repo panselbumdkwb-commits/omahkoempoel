@@ -10,5 +10,17 @@ export default async function PrintLayout({ children }: { children: React.ReactN
     redirect("/pos");
   }
 
-  return <div className="min-h-screen bg-white text-black">{children}</div>;
+  return (
+    <div className="min-h-screen bg-white text-black">
+      {/* CSS khusus printer thermal (lebar 80mm) — hanya berlaku saat
+          benar-benar mencetak, tidak mempengaruhi tampilan preview di layar. */}
+      <style>{`
+        @media print {
+          @page { size: 80mm auto; margin: 3mm; }
+          body { width: 80mm; }
+        }
+      `}</style>
+      {children}
+    </div>
+  );
 }

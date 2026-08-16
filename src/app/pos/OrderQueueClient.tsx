@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   getOrderDetailAction,
   updateCustomerNameAction,
+  updateOrderTableAction,
   processPaymentAction,
   closeOrderAction,
   sendToKitchenAction,
@@ -127,6 +128,7 @@ export default function OrderQueueClient({
         <OrderDetailModal
           orderId={selectedOrderId}
           paymentMethods={paymentMethods}
+          tables={tables}
           onClose={() => setSelectedOrderId(null)}
         />
       )}
@@ -137,16 +139,20 @@ export default function OrderQueueClient({
 function OrderDetailModal({
   orderId,
   paymentMethods,
+  tables,
   onClose,
 }: {
   orderId: string;
   paymentMethods: PaymentMethod[];
+  tables: TableRow[];
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getOrderDetailAction>> | null>(
     null
   );
   const [customerName, setCustomerName] = useState("");
+  const [tableId, setTableId] = useState("");
+  const [orderType, setOrderType] = useState<"dine_in" | "take_away">("dine_in");
   const [paymentMethodId, setPaymentMethodId] = useState(paymentMethods[0]?.id ?? "");
   const [referenceNo, setReferenceNo] = useState("");
   const [status, setStatus] = useState<string>("");
@@ -156,6 +162,8 @@ function OrderDetailModal({
     getOrderDetailAction(orderId).then((d) => {
       setDetail(d);
       setCustomerName(d.order.customer_name ?? "");
+      setTableId((d.order as any).table_id ?? "");
+      setOrderType((d.order.order_type as "dine_in" | "take_away") ?? "dine_in");
     });
   }, [orderId]);
 
@@ -163,6 +171,13 @@ function OrderDetailModal({
     startTransition(async () => {
       await updateCustomerNameAction(orderId, customerName);
       setStatus("Nama pelanggan tersimpan.");
+    });
+  }
+
+  function saveTableAndType() {
+    startTransition(async () => {
+      await updateOrderTableAction(orderId, orderType === "dine_in" ? tableId || null : null, orderType);
+      setStatus("Meja & tipe order tersimpan.");
     });
   }
 
@@ -210,8 +225,9 @@ function OrderDetailModal({
         ) : (
           <>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <p className="text-sm font-semibold">Data Pemesan</p>
               <div>
-                <label className="text-sm font-semibold block mb-1">Nama Pelanggan</label>
+                <label className="text-xs block mb-1">Nama Pelanggan</label>
                 <div className="flex gap-2">
                   <input
                     value={customerName}
@@ -221,6 +237,41 @@ function OrderDetailModal({
                   />
                   <button
                     onClick={saveCustomerName}
+                    disabled={isPending}
+                    className="px-3 rounded-md border border-border text-sm"
+                  >
+                    Simpan
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs block mb-1">Tipe Order & Meja</label>
+                <div className="flex gap-2">
+                  <select
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as "dine_in" | "take_away")}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                  >
+                    <option value="dine_in">Dine In</option>
+                    <option value="take_away">Take Away</option>
+                  </select>
+                  {orderType === "dine_in" && (
+                    <select
+                      value={tableId}
+                      onChange={(e) => setTableId(e.target.value)}
+                      className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                    >
+                      <option value="">Pilih meja</option>
+                      {tables.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          Meja {t.number}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={saveTableAndType}
                     disabled={isPending}
                     className="px-3 rounded-md border border-border text-sm"
                   >
