@@ -31,6 +31,8 @@ export default function LoginPage() {
 
     if (role === "OWNER" || role === "SUPER_ADMIN") {
       router.push("/admin");
+    } else if (role === "KITCHEN") {
+      router.push("/kitchen");
     } else {
       router.push("/pos");
     }

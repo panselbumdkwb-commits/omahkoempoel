@@ -17,6 +17,12 @@ export async function updateCustomerNameAction(orderId: string, customerName: st
   revalidatePath("/pos");
 }
 
+export async function sendToKitchenAction(orderId: string) {
+  await orderService.updateOrderStatus(orderId, "CONFIRMED");
+  revalidatePath("/pos");
+  revalidatePath("/kitchen");
+}
+
 export async function createOrderAction(input: orderService.CreateOrderInput) {
   const order = await orderService.createOrder(input);
   revalidatePath("/pos");

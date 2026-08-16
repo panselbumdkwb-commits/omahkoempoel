@@ -6,6 +6,7 @@ import {
   updateCustomerNameAction,
   processPaymentAction,
   closeOrderAction,
+  sendToKitchenAction,
 } from "./actions";
 import PosClient from "./PosClient";
 
@@ -252,6 +253,39 @@ function OrderDetailModal({
               <div className="flex justify-between font-semibold text-lg border-t border-border pt-3">
                 <span>Total</span>
                 <span>{formatRupiah(Number(detail.order.grand_total))}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {detail.order.status === "NEW" && (
+                  <button
+                    onClick={() =>
+                      startTransition(async () => {
+                        await sendToKitchenAction(orderId);
+                        setStatus("Order dikirim ke dapur.");
+                        setDetail({ ...detail, order: { ...detail.order, status: "CONFIRMED" } });
+                      })
+                    }
+                    className="text-sm px-3 py-2 rounded-md bg-secondary text-white font-semibold"
+                  >
+                    🍳 Kirim ke Dapur
+                  </button>
+                )}
+                <a
+                  href={`/print/ticket/${orderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm px-3 py-2 rounded-md border border-border"
+                >
+                  Cetak Tiket Dapur
+                </a>
+                <a
+                  href={`/print/receipt/${orderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm px-3 py-2 rounded-md border border-border"
+                >
+                  Cetak Nota
+                </a>
               </div>
             </div>
 
