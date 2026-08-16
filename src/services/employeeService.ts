@@ -80,6 +80,19 @@ export async function setEmployeeStatus(id: string, status: "active" | "inactive
   if (error) throw new Error(`Gagal mengubah status pegawai: ${error.message}`);
 }
 
+export async function setEmployeePin(id: string, pin: string) {
+  if (!/^\d{4,6}$/.test(pin)) {
+    throw new Error("PIN harus 4-6 digit angka.");
+  }
+  const supabase = createSupabaseServerClient();
+  const { hashPin } = await import("@/lib/pin");
+  const { error } = await supabase
+    .from("employees")
+    .update({ attendance_pin_hash: hashPin(pin) })
+    .eq("id", id);
+  if (error) throw new Error(`Gagal mengatur PIN: ${error.message}`);
+}
+
 // ---------------------------------------------------------------
 // ATTENDANCE
 // ---------------------------------------------------------------

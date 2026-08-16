@@ -50,7 +50,11 @@ export default function AttendanceClient({
     <div className="max-w-3xl mx-auto space-y-4">
       <h2 className="font-heading text-2xl text-primary">Absensi — {date}</h2>
       <p className="text-xs text-text-muted">
-        Pencatatan manual oleh Admin/Owner (belum ada integrasi perangkat biometrik/lokasi).
+        Pencatatan manual oleh Admin/Owner. Untuk absensi mandiri oleh pegawai lewat tablet, buka{" "}
+        <a href="/kiosk/attendance" target="_blank" className="text-primary underline">
+          Mode Kios
+        </a>{" "}
+        (pegawai perlu PIN — atur lewat halaman Pegawai).
       </p>
 
       {message && (

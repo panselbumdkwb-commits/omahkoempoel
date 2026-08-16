@@ -47,6 +47,13 @@ export async function toggleEmployeeStatusAction(id: string, currentStatus: stri
   revalidatePath("/admin/employees");
 }
 
+export async function setEmployeePinAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const pin = String(formData.get("pin") ?? "");
+  if (!id) throw new Error("ID pegawai tidak valid.");
+  await employeeService.setEmployeePin(id, pin);
+  revalidatePath("/admin/employees");
+}
 export async function recordAttendanceAction(formData: FormData) {
   const employeeId = String(formData.get("employeeId") ?? "");
   const date = String(formData.get("date") ?? "");

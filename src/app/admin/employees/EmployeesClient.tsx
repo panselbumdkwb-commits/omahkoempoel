@@ -6,6 +6,7 @@ import {
   createEmployeeAction,
   updateEmployeeAction,
   toggleEmployeeStatusAction,
+  setEmployeePinAction,
 } from "./actions";
 
 type Position = { id: string; name: string };
@@ -35,6 +36,7 @@ export default function EmployeesClient({
   positions: Position[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pinEditId, setPinEditId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -167,6 +169,12 @@ export default function EmployeesClient({
                       Edit
                     </button>
                     <button
+                      onClick={() => setPinEditId(pinEditId === e.id ? null : e.id)}
+                      className="text-sm px-3 py-1.5 rounded-md border border-border"
+                    >
+                      Atur PIN
+                    </button>
+                    <button
                       onClick={() =>
                         handleAction(
                           () => toggleEmployeeStatusAction(e.id, e.status),
@@ -179,6 +187,26 @@ export default function EmployeesClient({
                     </button>
                   </div>
                 </div>
+              )}
+              {pinEditId === e.id && (
+                <form
+                  action={(fd) => handleAction(() => setEmployeePinAction(fd), `PIN ${e.full_name} diperbarui.`)}
+                  className="mt-2 flex gap-2 items-center"
+                >
+                  <input type="hidden" name="id" value={e.id} />
+                  <input
+                    name="pin"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{4,6}"
+                    placeholder="PIN baru (4-6 digit)"
+                    required
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                  />
+                  <button type="submit" disabled={isPending} className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50">
+                    Simpan PIN
+                  </button>
+                </form>
               )}
             </div>
           ))}
