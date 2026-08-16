@@ -230,7 +230,9 @@ function OrderDetailModal({
               </div>
 
               <div>
-                <p className="text-sm font-semibold mb-2">Item Pesanan</p>
+                <p className="text-sm font-semibold mb-2">
+                  1. Verifikasi Item Pesanan <span className="text-xs text-text-muted font-normal">(cek kesesuaian dengan pelanggan)</span>
+                </p>
                 <div className="divide-y divide-border">
                   {detail.items.map((item: any) => (
                     <div key={item.id} className="py-2">
@@ -255,42 +257,46 @@ function OrderDetailModal({
                 <span>{formatRupiah(Number(detail.order.grand_total))}</span>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {detail.order.status === "NEW" && (
-                  <button
-                    onClick={() =>
-                      startTransition(async () => {
-                        await sendToKitchenAction(orderId);
-                        setStatus("Order dikirim ke dapur.");
-                        setDetail({ ...detail, order: { ...detail.order, status: "CONFIRMED" } });
-                      })
-                    }
-                    className="text-sm px-3 py-2 rounded-md bg-secondary text-white font-semibold"
+              <div>
+                <p className="text-sm font-semibold mb-2">2. Kirim ke Dapur / Cetak</p>
+                <div className="flex flex-wrap gap-2">
+                  {detail.order.status === "NEW" && (
+                    <button
+                      onClick={() =>
+                        startTransition(async () => {
+                          await sendToKitchenAction(orderId);
+                          setStatus("Order dikirim ke dapur.");
+                          setDetail({ ...detail, order: { ...detail.order, status: "CONFIRMED" } });
+                        })
+                      }
+                      className="text-sm px-3 py-2 rounded-md bg-secondary text-white font-semibold"
+                    >
+                      🍳 Kirim ke Dapur
+                    </button>
+                  )}
+                  <a
+                    href={`/print/ticket/${orderId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm px-3 py-2 rounded-md border border-border"
                   >
-                    🍳 Kirim ke Dapur
-                  </button>
-                )}
-                <a
-                  href={`/print/ticket/${orderId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm px-3 py-2 rounded-md border border-border"
-                >
-                  Cetak Tiket Dapur
-                </a>
-                <a
-                  href={`/print/receipt/${orderId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm px-3 py-2 rounded-md border border-border"
-                >
-                  Cetak Nota
-                </a>
+                    Cetak Tiket Dapur
+                  </a>
+                  <a
+                    href={`/print/receipt/${orderId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm px-3 py-2 rounded-md border border-border"
+                  >
+                    Cetak Nota
+                  </a>
+                </div>
               </div>
             </div>
 
             {detail.order.status !== "PAID" && (
               <div className="p-5 border-t border-border space-y-3">
+                <p className="text-sm font-semibold">3. Pembayaran</p>
                 <select
                   value={paymentMethodId}
                   onChange={(e) => setPaymentMethodId(e.target.value)}

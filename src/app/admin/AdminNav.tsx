@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-browser";
 
-export default function AdminNav() {
+export default function AdminNav({ role }: { role: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -39,6 +39,11 @@ export default function AdminNav() {
       <Link href="/admin/payroll" className={linkClass("/admin/payroll")}>
         Payroll
       </Link>
+      {role === "SUPER_ADMIN" && (
+        <Link href="/admin/users" className={linkClass("/admin/users")}>
+          Kelola User
+        </Link>
+      )}
       <button onClick={handleLogout} className="ml-auto px-3 py-2 text-sm text-danger">
         Logout
       </button>
