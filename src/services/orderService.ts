@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { getJakartaTodayRange } from "@/lib/timezone";
 
 export type CreateOrderInput = {
   businessId: string;
@@ -153,11 +154,12 @@ export async function listOpenOrders() {
 export async function listClosedOrders(params?: { from?: string; to?: string }) {
   const supabase = createSupabaseServerClient();
 
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const from = params?.from ?? startOfToday.toISOString();
-  const to = params?.to ?? now.toISOString();
+  // PENTING: jangan pakai `new Date().setHours(0,0,0,0)` — di server Vercel
+  // itu berpatokan pada jam SERVER (default UTC), bukan WIB, sehingga batas
+  // "hari ini" bisa meleset sampai 7 jam dari hari sebenarnya di Kota Batu.
+  const { startUTC, endUTC } = getJakartaTodayRange();
+  const from = params?.from ?? startUTC.toISOString();
+  const to = params?.to ?? endUTC.toISOString();
 
   const { data, error } = await supabase
     .from("orders")
@@ -178,7 +180,9 @@ export async function getOrderDetail(orderId: string) {
   const supabase = createSupabaseServerClient();
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, tables(number)")
+    .select(
+      "id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, created_at, tables(number)"
+    )
     .eq("id", orderId)
     .single();
   if (orderError) throw new Error(`Order tidak ditemukan: ${orderError.message}`);

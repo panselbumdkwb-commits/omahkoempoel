@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { formatJakartaDateTime } from "@/lib/timezone";
 import {
   createComponentAction,
   toggleComponentAction,
@@ -213,7 +214,7 @@ export default function PayrollClient({ components, periods }: { components: Com
                     </tbody>
                   </table>
                   <p className="hidden print:block text-center text-[10px] mt-2">
-                    Dicetak: {new Date().toLocaleString("id-ID")}
+                    Dicetak: {formatJakartaDateTime(new Date())}
                   </p>
                 </div>
               );

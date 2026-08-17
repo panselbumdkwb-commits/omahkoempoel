@@ -1,5 +1,6 @@
 import * as orderService from "@/services/orderService";
 import PrintButton from "../../PrintButton";
+import { formatJakartaDateTime } from "@/lib/timezone";
 
 export default async function KitchenTicketPage({ params }: { params: { orderId: string } }) {
   const { order, items } = await orderService.getOrderDetail(params.orderId);
@@ -27,7 +28,7 @@ export default async function KitchenTicketPage({ params }: { params: { orderId:
           </div>
         ))}
         <hr className="border-black my-2" />
-        <p className="text-center text-[10px]">{new Date().toLocaleString("id-ID")}</p>
+        <p className="text-center text-[10px]">{formatJakartaDateTime(new Date())}</p>
       </div>
       <PrintButton />
     </>

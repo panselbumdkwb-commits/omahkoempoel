@@ -13,3 +13,20 @@ export function getJakartaTodayRange(): { startUTC: Date; endUTC: Date } {
   const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000);
   return { startUTC, endUTC };
 }
+
+/**
+ * Format tanggal+jam ke WIB secara eksplisit (bukan mengandalkan jam
+ * lokal perangkat/server). Dipakai di semua halaman cetak (nota, tiket
+ * dapur, slip gaji) dan laporan supaya waktu yang tercetak selalu WIB,
+ * termasuk saat dirender di server Vercel yang defaultnya UTC.
+ */
+export function formatJakartaDateTime(date: Date | string): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date)) + " WIB";
+}

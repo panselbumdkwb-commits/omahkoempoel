@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { getSalesReportAction } from "./actions";
 import type { SalesReport } from "@/services/reportService";
+import { formatJakartaDateTime } from "@/lib/timezone";
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 
@@ -83,6 +84,28 @@ export default function ReportsClient({
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [printSection, setPrintSection] = useState<
+    "all" | "summary" | "payment" | "transactions" | "products"
+  >("all");
+
+  const PRINT_SECTION_LABEL: Record<typeof printSection, string> = {
+    all: "Laporan Lengkap",
+    summary: "Ringkasan Penjualan",
+    payment: "Rekap Metode Pembayaran",
+    transactions: "Daftar Transaksi Pembayaran",
+    products: "Produk Terlaris & Kurang Laku",
+  };
+
+  const periodLabel =
+    period === "today"
+      ? "Hari Ini"
+      : period === "week"
+        ? "Minggu Ini"
+        : period === "month"
+          ? "Bulan Ini"
+          : customStart && customEnd
+            ? `${customStart} s/d ${customEnd}`
+            : "Rentang Kustom";
 
   function loadPeriod(p: "today" | "week" | "month") {
     setPeriod(p);
@@ -117,14 +140,38 @@ export default function ReportsClient({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 print:max-w-full">
+      {/* CSS khusus saat mencetak laporan: A4, bukan 80mm thermal (beda dari
+          nota/tiket dapur/slip gaji), karena ini dokumen laporan kantor. */}
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 15mm; }
+          body { background: white; }
+        }
+      `}</style>
+
       <div className="flex flex-wrap justify-between items-center gap-3 print:hidden">
         <h2 className="font-heading text-2xl text-primary">Laporan Penjualan</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <select
+            value={printSection}
+            onChange={(e) => setPrintSection(e.target.value as typeof printSection)}
+            className="border border-border rounded-md px-2 py-2 text-sm bg-background dark:bg-background-dark"
+            title="Pilih jenis laporan yang akan dicetak"
+          >
+            {Object.entries(PRINT_SECTION_LABEL).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
           <button onClick={exportCSV} className="px-3 py-2 rounded-md border border-border text-sm">
             Export CSV
           </button>
-          <button onClick={() => window.print()} className="px-3 py-2 rounded-md border border-border text-sm">
-            Print
+          <button
+            onClick={() => window.print()}
+            className="px-3 py-2 rounded-md bg-primary text-white text-sm font-semibold"
+          >
+            🖨️ Cetak Laporan
           </button>
         </div>
       </div>
@@ -153,7 +200,7 @@ export default function ReportsClient({
       {isPending && <p className="text-sm text-text-muted">Memuat...</p>}
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 print:hidden">
         <StatCard label="Revenue" value={formatRupiah(report.revenue)} />
         <StatCard label="Jumlah Order" value={String(report.ordersCount)} />
         <StatCard label="Order Terbayar" value={String(report.paidOrdersCount)} />
@@ -161,7 +208,7 @@ export default function ReportsClient({
       </div>
 
       {/* TREND CHART */}
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
+      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
         <h3 className="font-heading text-lg text-primary mb-4">Tren Revenue Harian</h3>
         {report.dailyTrend.length === 0 ? (
           <p className="text-sm text-text-muted">Belum ada data pada periode ini.</p>
@@ -179,7 +226,7 @@ export default function ReportsClient({
       </section>
 
       {/* PAYMENT BREAKDOWN */}
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
+      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
         <h3 className="font-heading text-lg text-primary mb-4">Rekap per Metode Pembayaran</h3>
         {report.paymentBreakdown.length === 0 ? (
           <p className="text-sm text-text-muted">Belum ada pembayaran pada periode ini.</p>
@@ -245,7 +292,7 @@ export default function ReportsClient({
                       <tr key={i} className="border-t border-border">
                         <td className="py-1.5">{t.orderNumber}</td>
                         <td className="py-1.5">{t.methodName}</td>
-                        <td className="py-1.5">{new Date(t.paidAt).toLocaleString("id-ID")}</td>
+                        <td className="py-1.5">{formatJakartaDateTime(t.paidAt)}</td>
                         <td className="py-1.5">{t.referenceNo || "-"}</td>
                         <td className="py-1.5 text-right">{formatRupiah(t.amount)}</td>
                       </tr>
@@ -258,9 +305,129 @@ export default function ReportsClient({
       </section>
 
       {/* TOP / BOTTOM PRODUCTS */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4 print:hidden">
         <ProductTable title="Produk Terlaris" products={report.topProducts} />
         <ProductTable title="Produk Kurang Laku" products={report.bottomProducts} />
+      </div>
+
+      {/* ======================================================
+          BLOK KHUSUS CETAK — hanya tampil saat print (hidden di
+          layar). Format dokumen laporan polos: header bisnis,
+          judul laporan sesuai pilihan Owner, tabel hitam-putih
+          tanpa elemen dashboard (kartu warna, grafik, scroll).
+          ====================================================== */}
+      <div className="hidden print:block font-sans text-black bg-white">
+        <div className="text-center mb-6 pb-3 border-b-2 border-black">
+          <h1 className="text-xl font-bold">OMAH KOEMPOEL</h1>
+          <p className="text-sm">Laporan {PRINT_SECTION_LABEL[printSection]}</p>
+          <p className="text-xs mt-1">
+            Periode: {periodLabel} &middot; Dicetak: {formatJakartaDateTime(new Date())}
+          </p>
+        </div>
+
+        {(printSection === "all" || printSection === "summary") && (
+          <section className="mb-6">
+            <h2 className="font-bold text-sm mb-2 uppercase">Ringkasan Penjualan</h2>
+            <table className="w-full text-sm border-collapse">
+              <tbody>
+                <tr className="border-b border-black">
+                  <td className="py-1">Revenue</td>
+                  <td className="py-1 text-right font-semibold">{formatRupiah(report.revenue)}</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1">Jumlah Order</td>
+                  <td className="py-1 text-right">{report.ordersCount}</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1">Order Terbayar</td>
+                  <td className="py-1 text-right">{report.paidOrdersCount}</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1">Rata-rata Order</td>
+                  <td className="py-1 text-right">{formatRupiah(report.averageOrderValue)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {(printSection === "all" || printSection === "payment") && (
+          <section className="mb-6 break-inside-avoid">
+            <h2 className="font-bold text-sm mb-2 uppercase">Rekap per Metode Pembayaran</h2>
+            {report.paymentBreakdown.length === 0 ? (
+              <p className="text-sm">Belum ada pembayaran pada periode ini.</p>
+            ) : (
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-black text-left">
+                    <th className="py-1">Metode</th>
+                    <th className="py-1 text-right">Jumlah Transaksi</th>
+                    <th className="py-1 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.paymentBreakdown.map((p) => (
+                    <tr key={p.name} className="border-b border-black">
+                      <td className="py-1">{p.name}</td>
+                      <td className="py-1 text-right">{p.count}</td>
+                      <td className="py-1 text-right">{formatRupiah(p.amount)}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold">
+                    <td className="py-1">Total</td>
+                    <td className="py-1 text-right">
+                      {report.paymentBreakdown.reduce((s, p) => s + p.count, 0)}
+                    </td>
+                    <td className="py-1 text-right">
+                      {formatRupiah(report.paymentBreakdown.reduce((s, p) => s + p.amount, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
+
+        {(printSection === "all" || printSection === "transactions") && (
+          <section className="mb-6 break-inside-avoid">
+            <h2 className="font-bold text-sm mb-2 uppercase">Daftar Transaksi Pembayaran</h2>
+            {report.paymentTransactions.length === 0 ? (
+              <p className="text-sm">Belum ada transaksi pada periode ini.</p>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-black text-left">
+                    <th className="py-1">Order</th>
+                    <th className="py-1">Metode</th>
+                    <th className="py-1">Waktu</th>
+                    <th className="py-1">Referensi</th>
+                    <th className="py-1 text-right">Jumlah</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.paymentTransactions.map((t, i) => (
+                    <tr key={i} className="border-b border-black">
+                      <td className="py-1">{t.orderNumber}</td>
+                      <td className="py-1">{t.methodName}</td>
+                      <td className="py-1">{formatJakartaDateTime(t.paidAt)}</td>
+                      <td className="py-1">{t.referenceNo || "-"}</td>
+                      <td className="py-1 text-right">{formatRupiah(t.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
+
+        {(printSection === "all" || printSection === "products") && (
+          <section className="mb-6 break-inside-avoid">
+            <h2 className="font-bold text-sm mb-2 uppercase">Produk Terlaris</h2>
+            <PrintProductTable products={report.topProducts} />
+            <h2 className="font-bold text-sm mb-2 mt-4 uppercase">Produk Kurang Laku</h2>
+            <PrintProductTable products={report.bottomProducts} />
+          </section>
+        )}
       </div>
     </div>
   );
@@ -308,5 +475,33 @@ function ProductTable({
         </table>
       )}
     </section>
+  );
+}
+
+function PrintProductTable({
+  products,
+}: {
+  products: { name: string; quantity: number; revenue: number }[];
+}) {
+  if (products.length === 0) return <p className="text-sm">Belum ada data.</p>;
+  return (
+    <table className="w-full text-xs border-collapse mb-2">
+      <thead>
+        <tr className="border-b-2 border-black text-left">
+          <th className="py-1">Produk</th>
+          <th className="py-1 text-right">Qty</th>
+          <th className="py-1 text-right">Revenue</th>
+        </tr>
+      </thead>
+      <tbody>
+        {products.map((p) => (
+          <tr key={p.name} className="border-b border-black">
+            <td className="py-1">{p.name}</td>
+            <td className="py-1 text-right">{p.quantity}</td>
+            <td className="py-1 text-right">{formatRupiah(p.revenue)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

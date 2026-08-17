@@ -1,5 +1,6 @@
 import * as orderService from "@/services/orderService";
 import PrintButton from "../../PrintButton";
+import { formatJakartaDateTime } from "@/lib/timezone";
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -16,7 +17,7 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
         <p className="text-center text-[10px] mb-3">Ngumpul · Ngopi · Nikmati</p>
         <hr className="border-black mb-2" />
         <p>No. Transaksi: {order.order_number}</p>
-        <p>Tanggal: {new Date().toLocaleString("id-ID")}</p>
+        <p>Tanggal: {formatJakartaDateTime(order.created_at)}</p>
         <p>{order.order_type === "take_away" ? "Take Away" : `Meja ${table?.number ?? "-"}`}</p>
         {order.customer_name && <p>Pelanggan: {order.customer_name}</p>}
         <hr className="border-black my-2" />
