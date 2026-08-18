@@ -377,13 +377,25 @@ export default function MenuClient({
 
               {error && <p className="text-sogan text-sm font-jakarta">{error}</p>}
 
-              <button
-                onClick={submitOrder}
-                disabled={isPending || cart.length === 0}
-                className="w-full bg-sogan text-parchment font-jakarta font-bold py-4 rounded-md disabled:opacity-50"
-              >
-                {isPending ? "Mengirim pesanan..." : "SELESAI"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCartOpen(false)}
+                  disabled={isPending}
+                  className="flex-1 bg-white border-2 border-sogan text-sogan font-jakarta font-bold py-4 rounded-md disabled:opacity-50"
+                >
+                  ➕ Tambah Pesanan
+                </button>
+                <button
+                  onClick={submitOrder}
+                  disabled={isPending || cart.length === 0}
+                  className="flex-1 bg-sogan text-parchment font-jakarta font-bold py-4 rounded-md disabled:opacity-50"
+                >
+                  {isPending ? "Mengirim..." : "SELESAI"}
+                </button>
+              </div>
+              <p className="text-center text-[10px] text-wood-mid font-jakarta">
+                Tambah Pesanan = kembali ke menu untuk pilih menu lain lagi sebelum mengirim pesanan.
+              </p>
             </div>
           </div>
         </div>
