@@ -284,6 +284,11 @@ function OrderDetailModal({
                   dapat diubah lagi — data di bawah bersifat lihat saja (rekap).
                 </p>
               )}
+              {detail.order.notes && (
+                <p className="text-xs bg-batik-gold/20 border border-batik-gold/40 rounded-md p-2 text-wood-dark">
+                  ℹ️ {detail.order.notes}
+                </p>
+              )}
               <p className="text-sm font-semibold">Data Pemesan</p>
               <div>
                 <label className="text-xs block mb-1">Nama Pelanggan</label>

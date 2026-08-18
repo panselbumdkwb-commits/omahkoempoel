@@ -11,6 +11,14 @@ export type PublicOrderItemInput = {
 
 export type SubmitPublicOrderInput = {
   items: PublicOrderItemInput[];
+  tableId?: string | null;
+  customerName?: string | null;
+  /** Metode pembayaran yang DIPILIH pembeli saat checkout (Tunai/QRIS/EDC).
+   * Ini catatan NIAT pembeli untuk mempercepat verifikasi kasir — BUKAN
+   * pembayaran otomatis, karena belum ada integrasi payment gateway.
+   * Kasir tetap wajib konfirmasi penerimaan dana secara manual seperti
+   * biasa di /pos sebelum order ditutup. */
+  paymentMethodLabel?: string | null;
 };
 
 /**
@@ -51,13 +59,33 @@ export async function submitPublicOrder(input: SubmitPublicOrderInput) {
   );
   if (numberError) throw new Error(`Gagal membuat nomor order: ${numberError.message}`);
 
+  // Kalau tableId dikirim (dari QR meja), pastikan itu meja yang BENAR
+  // milik business ini — jangan percaya begitu saja dari input klien.
+  let validatedTableId: string | null = null;
+  if (input.tableId) {
+    const { data: table } = await supabaseAdmin
+      .from("tables")
+      .select("id")
+      .eq("id", input.tableId)
+      .eq("business_id", business.id)
+      .single();
+    validatedTableId = table?.id ?? null;
+  }
+
+  const customerName = input.customerName?.trim().slice(0, 100) || null;
+  const paymentNote = input.paymentMethodLabel
+    ? `Metode pembayaran (pilihan pembeli via QR): ${input.paymentMethodLabel} — kasir wajib konfirmasi penerimaan dana sebelum menutup order.`
+    : null;
+
   const { data: order, error: orderError } = await supabaseAdmin
     .from("orders")
     .insert({
       business_id: business.id,
       order_number: orderNumber,
       order_type: "dine_in",
-      table_id: null, // dilengkapi kasir saat memproses order
+      table_id: validatedTableId, // terisi otomatis kalau dari QR meja, kalau tidak dilengkapi kasir
+      customer_name: customerName,
+      notes: paymentNote,
       status: "NEW",
       created_by: null,
     })

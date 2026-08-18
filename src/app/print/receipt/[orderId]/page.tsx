@@ -1,6 +1,7 @@
 import * as orderService from "@/services/orderService";
 import PrintButton from "../../PrintButton";
 import { formatJakartaDateTime } from "@/lib/timezone";
+import { extractInclusiveTax } from "@/lib/tax";
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -9,6 +10,7 @@ function formatRupiah(n: number) {
 export default async function ReceiptPage({ params }: { params: { orderId: string } }) {
   const { order, items, cashierName } = await orderService.getOrderDetail(params.orderId);
   const table = Array.isArray(order.tables) ? order.tables[0] : order.tables;
+  const { dpp, taxAmount } = extractInclusiveTax(Number(order.subtotal));
 
   // Kalau order belum PAID/CLOSED (closed_by belum ada, mis. nota dicetak
   // sebagai pratinjau sebelum bayar), pakai nama staf yang sedang login
@@ -42,16 +44,16 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
         ))}
         <hr className="border-black my-2" />
         <div className="flex justify-between">
-          <span>Subtotal</span>
-          <span>{formatRupiah(Number(order.subtotal))}</span>
+          <span>DPP (Sebelum Pajak)</span>
+          <span>{formatRupiah(dpp)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Pajak Daerah (PB1) 10%</span>
+          <span>{formatRupiah(taxAmount)}</span>
         </div>
         <div className="flex justify-between">
           <span>Diskon</span>
           <span>Rp 0</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Pajak</span>
-          <span>Rp 0*</span>
         </div>
         <div className="flex justify-between">
           <span>Service Charge</span>
@@ -62,7 +64,7 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
           <span>TOTAL</span>
           <span>{formatRupiah(Number(order.grand_total))}</span>
         </div>
-        <p className="text-center text-[10px] mt-4">*Pajak belum dikonfigurasi di sistem.</p>
+        <p className="text-center text-[10px] mt-4">*Harga sudah termasuk Pajak Daerah (PB1) 10%.</p>
         <p className="text-center text-[10px] mt-4">Terima kasih atas kunjungan Anda 🙏</p>
       </div>
       <PrintButton />

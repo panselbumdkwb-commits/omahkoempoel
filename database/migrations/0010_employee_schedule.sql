@@ -20,6 +20,12 @@ create table if not exists employee_schedules (
 
 alter table employee_schedules enable row level security;
 
+-- drop if exists dulu supaya file ini AMAN dijalankan ulang (idempotent) —
+-- ini yang menyebabkan error "policy already exists" sebelumnya kalau
+-- migrasi ini sempat berjalan sebagian lalu dijalankan lagi dari awal.
+drop policy if exists employee_schedules_select on employee_schedules;
+drop policy if exists employee_schedules_manage on employee_schedules;
+
 -- Bisa dibaca semua staf yang login (supaya pegawai bisa lihat jadwalnya
 -- sendiri, bukan cuma admin) — sama pola aksesnya dengan tabel employees.
 create policy employee_schedules_select on employee_schedules

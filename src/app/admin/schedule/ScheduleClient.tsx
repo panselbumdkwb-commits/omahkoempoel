@@ -15,6 +15,18 @@ const DISPLAY_DAYS = [
   { value: 0, label: "Minggu" },
 ];
 
+// 3 shift baku: 2 shift utama + 1 shift cadangan. Shift 2 berakhir tengah
+// malam — disimpan sebagai "00:00" (setara 24:00) supaya tetap valid untuk
+// <input type="time"> di browser.
+const SHIFT_PRESETS = [
+  { id: "shift1", label: "Shift 1 (09:00–17:00)", start: "09:00", end: "17:00" },
+  { id: "shift2", label: "Shift 2 (16:00–24:00)", start: "16:00", end: "00:00" },
+  { id: "shift3", label: "Shift 3 – Cadangan (13:00–21:00)", start: "13:00", end: "21:00" },
+  { id: "custom", label: "Kustom (atur manual)", start: "", end: "" },
+] as const;
+
+type ShiftId = (typeof SHIFT_PRESETS)[number]["id"];
+
 type Employee = { id: string; full_name: string; employee_code: string; status: string };
 type ScheduleRow = {
   id: string;
@@ -26,7 +38,12 @@ type ScheduleRow = {
   note: string | null;
 };
 
-type DayState = { shiftStart: string; shiftEnd: string; isOff: boolean };
+type DayState = { shiftPreset: ShiftId | ""; shiftStart: string; shiftEnd: string; isOff: boolean };
+
+function detectPreset(start: string, end: string): ShiftId {
+  const match = SHIFT_PRESETS.find((p) => p.id !== "custom" && p.start === start && p.end === end);
+  return match ? match.id : "custom";
+}
 
 function buildInitialState(employees: Employee[], schedule: ScheduleRow[]) {
   const state: Record<string, Record<number, DayState>> = {};
@@ -34,9 +51,12 @@ function buildInitialState(employees: Employee[], schedule: ScheduleRow[]) {
     state[emp.id] = {};
     for (const day of DISPLAY_DAYS) {
       const existing = schedule.find((s) => s.employee_id === emp.id && s.day_of_week === day.value);
+      const start = existing?.shift_start?.slice(0, 5) ?? "";
+      const end = existing?.shift_end?.slice(0, 5) ?? "";
       state[emp.id][day.value] = {
-        shiftStart: existing?.shift_start?.slice(0, 5) ?? "",
-        shiftEnd: existing?.shift_end?.slice(0, 5) ?? "",
+        shiftPreset: existing?.is_off ? "" : start && end ? detectPreset(start, end) : "",
+        shiftStart: start,
+        shiftEnd: end,
         isOff: existing?.is_off ?? false,
       };
     }
@@ -55,13 +75,36 @@ export default function ScheduleClient({
   const [isPending, startTransition] = useTransition();
   const [savedStatus, setSavedStatus] = useState<Record<string, string>>({});
 
-  function updateCell(employeeId: string, day: number, patch: Partial<DayState>) {
+  function selectShift(employeeId: string, day: number, value: string) {
+    setState((prev) => {
+      const current = prev[employeeId][day];
+      if (value === "off") {
+        return {
+          ...prev,
+          [employeeId]: { ...prev[employeeId], [day]: { ...current, isOff: true, shiftPreset: "" } },
+        };
+      }
+      const preset = SHIFT_PRESETS.find((p) => p.id === value);
+      if (!preset) return prev;
+      return {
+        ...prev,
+        [employeeId]: {
+          ...prev[employeeId],
+          [day]: {
+            shiftPreset: preset.id,
+            shiftStart: preset.start,
+            shiftEnd: preset.end,
+            isOff: false,
+          },
+        },
+      };
+    });
+  }
+
+  function updateManualTime(employeeId: string, day: number, patch: Partial<DayState>) {
     setState((prev) => ({
       ...prev,
-      [employeeId]: {
-        ...prev[employeeId],
-        [day]: { ...prev[employeeId][day], ...patch },
-      },
+      [employeeId]: { ...prev[employeeId], [day]: { ...prev[employeeId][day], ...patch } },
     }));
   }
 
@@ -71,12 +114,18 @@ export default function ScheduleClient({
       try {
         for (const day of DISPLAY_DAYS) {
           const cell = state[employeeId][day.value];
+          const preset = SHIFT_PRESETS.find((p) => p.id === cell.shiftPreset);
           await upsertScheduleEntryAction({
             employeeId,
             dayOfWeek: day.value,
             shiftStart: cell.isOff ? null : cell.shiftStart || null,
             shiftEnd: cell.isOff ? null : cell.shiftEnd || null,
             isOff: cell.isOff,
+            note: cell.isOff
+              ? undefined
+              : preset && preset.id !== "custom"
+                ? preset.label.split(" (")[0]
+                : "Kustom",
           });
         }
         setSavedStatus((s) => ({ ...s, [employeeId]: "Jadwal tersimpan." }));
@@ -102,8 +151,16 @@ export default function ScheduleClient({
       <div>
         <h2 className="font-heading text-2xl text-primary">Jadwal Kerja Pegawai</h2>
         <p className="text-sm text-text-muted mt-1">
-          Atur jam kerja mingguan per pegawai. Centang "Libur" untuk hari pegawai tidak masuk.
+          Pilih shift per hari untuk tiap pegawai. Tersedia 3 shift baku: 2 shift utama + 1 shift
+          cadangan, atau pilih "Kustom" untuk atur jam manual.
         </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {SHIFT_PRESETS.filter((p) => p.id !== "custom").map((p) => (
+            <span key={p.id} className="px-2 py-1 rounded-full bg-batik-gold/20 text-wood-dark">
+              {p.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -128,32 +185,47 @@ export default function ScheduleClient({
             <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
               {DISPLAY_DAYS.map((day) => {
                 const cell = state[emp.id][day.value];
+                const selectValue = cell.isOff ? "off" : cell.shiftPreset || "";
                 return (
                   <div key={day.value} className="border border-border rounded-md p-2">
                     <p className="text-xs font-semibold text-text-muted mb-1">{day.label}</p>
-                    <label className="flex items-center gap-1 text-xs mb-2">
-                      <input
-                        type="checkbox"
-                        checked={cell.isOff}
-                        onChange={(e) => updateCell(emp.id, day.value, { isOff: e.target.checked })}
-                      />
-                      Libur
-                    </label>
-                    {!cell.isOff && (
+                    <select
+                      value={selectValue}
+                      onChange={(e) => selectShift(emp.id, day.value, e.target.value)}
+                      className="w-full border border-border rounded text-xs p-1 bg-background dark:bg-background-dark mb-1"
+                    >
+                      <option value="" disabled>
+                        Pilih...
+                      </option>
+                      <option value="off">Libur</option>
+                      {SHIFT_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.id === "custom" ? "Kustom" : p.label.split(" (")[0]}
+                        </option>
+                      ))}
+                    </select>
+
+                    {!cell.isOff && cell.shiftPreset === "custom" && (
                       <div className="space-y-1">
                         <input
                           type="time"
                           value={cell.shiftStart}
-                          onChange={(e) => updateCell(emp.id, day.value, { shiftStart: e.target.value })}
+                          onChange={(e) => updateManualTime(emp.id, day.value, { shiftStart: e.target.value })}
                           className="w-full border border-border rounded text-xs p-1 bg-background dark:bg-background-dark"
                         />
                         <input
                           type="time"
                           value={cell.shiftEnd}
-                          onChange={(e) => updateCell(emp.id, day.value, { shiftEnd: e.target.value })}
+                          onChange={(e) => updateManualTime(emp.id, day.value, { shiftEnd: e.target.value })}
                           className="w-full border border-border rounded text-xs p-1 bg-background dark:bg-background-dark"
                         />
                       </div>
+                    )}
+
+                    {!cell.isOff && cell.shiftPreset && cell.shiftPreset !== "custom" && (
+                      <p className="text-[10px] text-text-muted text-center">
+                        {cell.shiftStart} – {cell.shiftEnd === "00:00" ? "24:00" : cell.shiftEnd}
+                      </p>
                     )}
                   </div>
                 );

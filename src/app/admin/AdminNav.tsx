@@ -42,6 +42,9 @@ export default function AdminNav({ role }: { role: string | null }) {
       <Link href="/admin/schedule" className={linkClass("/admin/schedule")}>
         Jadwal Kerja
       </Link>
+      <Link href="/admin/qr-meja" className={linkClass("/admin/qr-meja")}>
+        QR Meja
+      </Link>
       {role === "SUPER_ADMIN" && (
         <Link href="/admin/users" className={linkClass("/admin/users")}>
           Kelola User

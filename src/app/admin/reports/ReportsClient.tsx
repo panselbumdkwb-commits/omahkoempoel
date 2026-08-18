@@ -13,6 +13,7 @@ import {
 import { getSalesReportAction } from "./actions";
 import type { SalesReport } from "@/services/reportService";
 import { formatJakartaDateTime } from "@/lib/timezone";
+import { extractInclusiveTax } from "@/lib/tax";
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 
@@ -331,8 +332,18 @@ export default function ReportsClient({
             <table className="w-full text-sm border-collapse">
               <tbody>
                 <tr className="border-b border-black">
-                  <td className="py-1">Revenue</td>
+                  <td className="py-1">Revenue (Termasuk Pajak)</td>
                   <td className="py-1 text-right font-semibold">{formatRupiah(report.revenue)}</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1">DPP (Sebelum Pajak)</td>
+                  <td className="py-1 text-right">{formatRupiah(extractInclusiveTax(report.revenue).dpp)}</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1">Pajak Daerah (PB1) 10%</td>
+                  <td className="py-1 text-right">
+                    {formatRupiah(extractInclusiveTax(report.revenue).taxAmount)}
+                  </td>
                 </tr>
                 <tr className="border-b border-black">
                   <td className="py-1">Jumlah Order</td>

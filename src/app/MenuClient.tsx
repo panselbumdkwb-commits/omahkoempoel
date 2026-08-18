@@ -33,6 +33,8 @@ function formatRupiah(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
 }
 
+type PresetTable = { id: string; number: string } | null;
+
 export default function MenuClient({
   categories,
   products,
@@ -40,6 +42,7 @@ export default function MenuClient({
   menuUnavailable,
   showDateTimeClock,
   cafeOperatingHours,
+  presetTable,
 }: {
   categories: Category[];
   products: Product[];
@@ -47,11 +50,16 @@ export default function MenuClient({
   menuUnavailable: boolean;
   showDateTimeClock: boolean;
   cafeOperatingHours: string;
+  presetTable: PresetTable;
 }) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [pickerProduct, setPickerProduct] = useState<Product | null>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"Tunai di Kasir" | "QRIS" | "EDC">(
+    "Tunai di Kasir"
+  );
   const [confirmation, setConfirmation] = useState<{
     orderId: string;
     orderNumber: string;
@@ -124,6 +132,9 @@ export default function MenuClient({
             notes: l.notes || undefined,
             modifierIds: l.modifiers.map((m) => m.id),
           })),
+          tableId: presetTable?.id ?? null,
+          customerName: customerName || null,
+          paymentMethodLabel: paymentMethod,
         });
         setConfirmation({
           orderId: result.orderId,
@@ -164,6 +175,14 @@ export default function MenuClient({
           <DateTimeBadge variant="full" className="block font-jakarta text-batik-gold text-xs mt-3" />
         )}
         <p className="font-jakarta text-wood-light text-xs mt-1">🕐 Jam Buka: {cafeOperatingHours}</p>
+        <p className="font-jakarta text-wood-light text-[10px] mt-1">
+          *Harga sudah termasuk Pajak Daerah (PB1) 10%
+        </p>
+        {presetTable && (
+          <p className="inline-block mt-3 px-4 py-1 rounded-full bg-batik-gold text-wood-dark font-jakarta font-bold text-sm">
+            🪑 Meja {presetTable.number}
+          </p>
+        )}
       </header>
       <BatikDivider className="opacity-70" />
 
@@ -302,9 +321,54 @@ export default function MenuClient({
             </div>
 
             <div className="p-5 border-t border-wood-light/30 space-y-3">
-              <p className="text-xs text-wood-mid font-jakarta">
-                Nomor meja & nama Anda akan dilengkapi oleh kasir saat memproses pesanan.
-              </p>
+              {presetTable ? (
+                <p className="text-xs text-wood-mid font-jakarta">
+                  🪑 Meja <span className="font-bold">{presetTable.number}</span> — nomor meja terisi
+                  otomatis dari QR yang Anda scan.
+                </p>
+              ) : (
+                <p className="text-xs text-wood-mid font-jakarta">
+                  Nomor meja akan dilengkapi oleh kasir saat memproses pesanan.
+                </p>
+              )}
+
+              <div>
+                <label className="text-xs text-wood-mid font-jakarta block mb-1">
+                  Nama Pemesan (opsional)
+                </label>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nama Anda"
+                  maxLength={100}
+                  className="w-full border border-wood-light/50 rounded-md p-2 bg-white font-jakarta text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-wood-mid font-jakarta block mb-1">
+                  Metode Pembayaran (di kasir/meja)
+                </label>
+                <div className="flex gap-2">
+                  {(["Tunai di Kasir", "QRIS", "EDC"] as const).map((method) => (
+                    <button
+                      key={method}
+                      onClick={() => setPaymentMethod(method)}
+                      className={`flex-1 py-2 rounded-md text-xs font-jakarta font-semibold border ${
+                        paymentMethod === method
+                          ? "bg-sogan text-parchment border-sogan"
+                          : "bg-white text-wood-dark border-wood-light/50"
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-wood-mid font-jakarta mt-1">
+                  Pembayaran tetap dikonfirmasi &amp; diproses langsung oleh kasir — pilihan ini hanya
+                  memberi tahu kasir metode yang Anda inginkan.
+                </p>
+              </div>
 
               <div className="flex justify-between font-jakarta font-bold text-wood-dark text-lg">
                 <span>Total</span>

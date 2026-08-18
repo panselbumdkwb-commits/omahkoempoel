@@ -182,7 +182,7 @@ export async function getOrderDetail(orderId: string) {
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, created_at, closed_by, tables(number)"
+      "id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, created_at, closed_by, notes, tables(number)"
     )
     .eq("id", orderId)
     .single();
