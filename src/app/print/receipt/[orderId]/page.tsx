@@ -7,8 +7,13 @@ function formatRupiah(n: number) {
 }
 
 export default async function ReceiptPage({ params }: { params: { orderId: string } }) {
-  const { order, items } = await orderService.getOrderDetail(params.orderId);
+  const { order, items, cashierName } = await orderService.getOrderDetail(params.orderId);
   const table = Array.isArray(order.tables) ? order.tables[0] : order.tables;
+
+  // Kalau order belum PAID/CLOSED (closed_by belum ada, mis. nota dicetak
+  // sebagai pratinjau sebelum bayar), pakai nama staf yang sedang login
+  // sebagai "kasir yang bertugas" saat ini.
+  const displayCashierName = cashierName ?? (await orderService.getCurrentStaffName());
 
   return (
     <>
@@ -18,6 +23,7 @@ export default async function ReceiptPage({ params }: { params: { orderId: strin
         <hr className="border-black mb-2" />
         <p>No. Transaksi: {order.order_number}</p>
         <p>Tanggal: {formatJakartaDateTime(order.created_at)}</p>
+        <p>Kasir: {displayCashierName ?? "-"}</p>
         <p>{order.order_type === "take_away" ? "Take Away" : `Meja ${table?.number ?? "-"}`}</p>
         {order.customer_name && <p>Pelanggan: {order.customer_name}</p>}
         <hr className="border-black my-2" />

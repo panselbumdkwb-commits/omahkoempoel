@@ -9,3 +9,7 @@ export async function listKioskEmployeesAction() {
 export async function kioskClockAction(employeeId: string, pin: string, action: "in" | "out") {
   return kioskService.kioskClockAttendance(employeeId, pin, action);
 }
+
+export async function getTodayScheduleAction(employeeId: string) {
+  return kioskService.getTodayScheduleForEmployee(employeeId);
+}

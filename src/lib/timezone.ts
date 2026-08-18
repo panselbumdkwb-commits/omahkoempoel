@@ -30,3 +30,15 @@ export function formatJakartaDateTime(date: Date | string): string {
     minute: "2-digit",
   }).format(new Date(date)) + " WIB";
 }
+
+/** Hari ini (0=Minggu..6=Sabtu, sama seperti Date.getDay()) menurut WIB —
+ * dipakai untuk mencocokkan jadwal kerja pegawai di kiosk absensi, jangan
+ * pakai Date.getDay() langsung karena itu ikut zona waktu server/browser. */
+export function getJakartaDayOfWeek(date: Date = new Date()): number {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jakarta",
+    weekday: "short",
+  }).format(date);
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return map[weekday] ?? date.getDay();
+}

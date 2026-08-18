@@ -31,9 +31,11 @@ function positionName(e: Employee) {
 export default function EmployeesClient({
   employees,
   positions,
+  employeeWorkHours,
 }: {
   employees: Employee[];
   positions: Position[];
+  employeeWorkHours: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pinEditId, setPinEditId] = useState<string | null>(null);
@@ -54,6 +56,15 @@ export default function EmployeesClient({
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      <div className="rounded-md bg-batik-gold/10 border border-batik-gold/40 p-3 text-sm flex justify-between items-center gap-3">
+        <span>
+          🕐 <span className="font-semibold">Jam Kerja Pegawai:</span> {employeeWorkHours}
+        </span>
+        <a href="/admin/settings" className="text-primary underline whitespace-nowrap text-xs">
+          Ubah di Pengaturan
+        </a>
+      </div>
+
       {message && (
         <div className="rounded-md bg-surface dark:bg-surface-dark border border-border p-3 text-sm">
           {message}

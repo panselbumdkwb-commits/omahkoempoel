@@ -174,14 +174,15 @@ export async function listClosedOrders(params?: { from?: string; to?: string }) 
   return data ?? [];
 }
 
-/** Detail lengkap 1 order (item, modifier, meja) untuk ditampilkan
- * saat kasir membuka sebuah order dari daftar order masuk. */
+/** Detail lengkap 1 order (item, modifier, meja, kasir yang menutup/
+ * memproses pembayaran) untuk ditampilkan saat kasir membuka sebuah
+ * order dari daftar order masuk, dan untuk dicetak di nota. */
 export async function getOrderDetail(orderId: string) {
   const supabase = createSupabaseServerClient();
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, created_at, tables(number)"
+      "id, order_number, order_type, status, subtotal, grand_total, customer_name, table_id, created_at, closed_by, tables(number)"
     )
     .eq("id", orderId)
     .single();
@@ -193,7 +194,32 @@ export async function getOrderDetail(orderId: string) {
     .eq("order_id", orderId);
   if (itemsError) throw new Error(`Gagal memuat item order: ${itemsError.message}`);
 
-  return { order, items: items ?? [] };
+  // Query terpisah (bukan embed relasi PostgREST) supaya tidak bergantung
+  // pada tebakan nama FK constraint — orders punya 2 relasi ke profiles
+  // (created_by & closed_by) yang bisa ambigu kalau di-embed langsung.
+  let cashierName: string | null = null;
+  if (order.closed_by) {
+    const { data: cashierProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", order.closed_by)
+      .single();
+    cashierName = cashierProfile?.full_name ?? null;
+  }
+
+  return { order, items: items ?? [], cashierName };
+}
+
+/** Nama staf yang sedang login (dipakai untuk label "Kasir" di nota saat
+ * order belum dibayar/ditutup, jadi belum ada closed_by). */
+export async function getCurrentStaffName(): Promise<string | null> {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+  return data?.full_name ?? null;
 }
 
 /** Kasir melengkapi meja & tipe order untuk pesanan yang masuk tanpa

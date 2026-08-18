@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifyPin } from "@/lib/pin";
-import { getJakartaTodayRange } from "@/lib/timezone";
+import { getJakartaTodayRange, getJakartaDayOfWeek } from "@/lib/timezone";
 
 /** Daftar pegawai aktif untuk dipilih di layar kios — HANYA nama,
  * tidak ada data gaji/sensitif lain yang ditampilkan di layar publik. */
@@ -19,6 +19,20 @@ function todayJakartaDateString(): string {
   const { startUTC } = getJakartaTodayRange();
   const shifted = new Date(startUTC.getTime() + 7 * 60 * 60 * 1000);
   return shifted.toISOString().slice(0, 10);
+}
+
+/** Jadwal kerja pegawai HARI INI (dipakai di layar kiosk absensi supaya
+ * pegawai tahu jam kerjanya sebelum absen masuk/pulang). Lewat admin
+ * client karena kiosk tidak punya sesi login. */
+export async function getTodayScheduleForEmployee(employeeId: string) {
+  const dayOfWeek = getJakartaDayOfWeek();
+  const { data } = await supabaseAdmin
+    .from("employee_schedules")
+    .select("shift_start, shift_end, is_off")
+    .eq("employee_id", employeeId)
+    .eq("day_of_week", dayOfWeek)
+    .maybeSingle();
+  return data ?? null;
 }
 
 /**

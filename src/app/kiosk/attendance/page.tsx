@@ -1,4 +1,5 @@
 import * as kioskService from "@/services/kioskService";
+import { getShowDateTimeClock } from "@/services/settingsService";
 import KioskClient from "./KioskClient";
 
 // Halaman ini memakai supabaseAdmin (bukan cookies), jadi Next.js tidak
@@ -7,6 +8,9 @@ import KioskClient from "./KioskClient";
 export const dynamic = "force-dynamic";
 
 export default async function KioskAttendancePage() {
-  const employees = await kioskService.listActiveEmployeesForKiosk();
-  return <KioskClient employees={employees} />;
+  const [employees, showDateTimeClock] = await Promise.all([
+    kioskService.listActiveEmployeesForKiosk(),
+    getShowDateTimeClock(),
+  ]);
+  return <KioskClient employees={employees} showDateTimeClock={showDateTimeClock} />;
 }

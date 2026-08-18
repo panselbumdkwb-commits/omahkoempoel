@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import BatikDivider from "@/components/BatikDivider";
+import DateTimeBadge from "@/components/DateTimeBadge";
 import { submitPublicOrderAction } from "./actions";
 
 type Variant = { id: string; name: string; price_adjustment: number };
@@ -37,11 +38,15 @@ export default function MenuClient({
   products,
   tables,
   menuUnavailable,
+  showDateTimeClock,
+  cafeOperatingHours,
 }: {
   categories: Category[];
   products: Product[];
   tables: TableRow[];
   menuUnavailable: boolean;
+  showDateTimeClock: boolean;
+  cafeOperatingHours: string;
 }) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -155,6 +160,10 @@ export default function MenuClient({
         </p>
         <h1 className="font-ukir text-4xl sm:text-5xl text-parchment mb-1">Omah Koempoel</h1>
         <p className="font-jakarta text-wood-light text-sm">Pilih menu, sentuh untuk memesan</p>
+        {showDateTimeClock && (
+          <DateTimeBadge variant="full" className="block font-jakarta text-batik-gold text-xs mt-3" />
+        )}
+        <p className="font-jakarta text-wood-light text-xs mt-1">🕐 Jam Buka: {cafeOperatingHours}</p>
       </header>
       <BatikDivider className="opacity-70" />
 

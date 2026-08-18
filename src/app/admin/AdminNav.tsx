@@ -39,9 +39,17 @@ export default function AdminNav({ role }: { role: string | null }) {
       <Link href="/admin/payroll" className={linkClass("/admin/payroll")}>
         Payroll
       </Link>
+      <Link href="/admin/schedule" className={linkClass("/admin/schedule")}>
+        Jadwal Kerja
+      </Link>
       {role === "SUPER_ADMIN" && (
         <Link href="/admin/users" className={linkClass("/admin/users")}>
           Kelola User
+        </Link>
+      )}
+      {role === "SUPER_ADMIN" && (
+        <Link href="/admin/settings" className={linkClass("/admin/settings")}>
+          Pengaturan
         </Link>
       )}
       <button onClick={handleLogout} className="ml-auto px-3 py-2 text-sm text-danger">

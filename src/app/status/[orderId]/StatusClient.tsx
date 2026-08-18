@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getPublicOrderStatusAction } from "../../actions";
+import DateTimeBadge from "@/components/DateTimeBadge";
 
 type OrderStatus = {
   order_number: string;
@@ -28,7 +29,13 @@ function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
-export default function StatusClient({ orderId }: { orderId: string }) {
+export default function StatusClient({
+  orderId,
+  showDateTimeClock,
+}: {
+  orderId: string;
+  showDateTimeClock: boolean;
+}) {
   const [data, setData] = useState<OrderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justPaid, setJustPaid] = useState(false);
@@ -80,6 +87,9 @@ export default function StatusClient({ orderId }: { orderId: string }) {
   return (
     <main className="min-h-screen bg-wood-grain flex items-center justify-center p-6">
       <div className="max-w-sm w-full bg-parchment rounded-2xl p-8 text-center shadow-xl">
+        {showDateTimeClock && (
+          <DateTimeBadge variant="full" className="block font-jakarta text-xs text-wood-mid mb-4" />
+        )}
         {!data && !error && (
           <p className="font-jakarta text-wood-mid">Memuat status pesanan...</p>
         )}

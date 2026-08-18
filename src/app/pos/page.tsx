@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import * as orderService from "@/services/orderService";
+import { getShowDateTimeClock } from "@/services/settingsService";
 import PosTopBar from "./PosTopBar";
 import OrderQueueClient from "./OrderQueueClient";
 
@@ -15,7 +16,7 @@ export default async function PosPage() {
     redirect("/login");
   }
 
-  const [openOrders, { data: products }, { data: tables }, { data: paymentMethods }, { data: business }] =
+  const [openOrders, { data: products }, { data: tables }, { data: paymentMethods }, { data: business }, showDateTimeClock] =
     await Promise.all([
       orderService.listOpenOrders(),
       supabase
@@ -26,11 +27,12 @@ export default async function PosPage() {
       supabase.from("tables").select("id, number, status").order("number"),
       supabase.from("payment_methods").select("id, code, name").eq("is_active", true),
       supabase.from("business").select("id, name").limit(1).single(),
+      getShowDateTimeClock(),
     ]);
 
   return (
     <div className="min-h-screen bg-background dark:bg-background-dark">
-      <PosTopBar />
+      <PosTopBar showDateTimeClock={showDateTimeClock} />
       <OrderQueueClient
         initialOrders={openOrders}
         businessId={business?.id ?? ""}

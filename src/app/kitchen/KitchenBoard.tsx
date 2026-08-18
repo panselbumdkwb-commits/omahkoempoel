@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-browser";
 import { advanceOrderStatusAction } from "./actions";
 import type { KitchenOrder } from "@/services/kitchenService";
+import DateTimeBadge from "@/components/DateTimeBadge";
 
 function tableLabel(order: KitchenOrder) {
   if (order.order_type === "take_away") return "Take Away";
@@ -26,7 +27,13 @@ function timeAgo(iso: string) {
   return `${mins} menit lalu`;
 }
 
-export default function KitchenBoard({ initialOrders }: { initialOrders: KitchenOrder[] }) {
+export default function KitchenBoard({
+  initialOrders,
+  showDateTimeClock,
+}: {
+  initialOrders: KitchenOrder[];
+  showDateTimeClock: boolean;
+}) {
   const router = useRouter();
 
   useEffect(() => {
@@ -57,6 +64,9 @@ export default function KitchenBoard({ initialOrders }: { initialOrders: Kitchen
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-border px-4 py-3 flex justify-between items-center bg-surface dark:bg-surface-dark">
         <h1 className="font-heading text-xl text-primary">Omah Mburi — Dapur</h1>
+        {showDateTimeClock && (
+          <DateTimeBadge variant="compact" className="text-sm text-text-muted hidden sm:inline" />
+        )}
         <button onClick={handleLogout} className="text-sm text-danger font-semibold">
           Logout
         </button>
