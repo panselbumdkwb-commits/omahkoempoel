@@ -6,7 +6,7 @@ import * as payrollService from "@/services/payrollService";
 export async function createComponentAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const componentType = String(formData.get("componentType") ?? "earning") as "earning" | "deduction";
-  const calcType = String(formData.get("calcType") ?? "fixed") as "fixed" | "percent_of_basic";
+  const calcType = String(formData.get("calcType") ?? "fixed") as payrollService.PayrollCalcType;
   const value = Number(formData.get("value") ?? 0);
   const capBaseRaw = String(formData.get("capBase") ?? "");
   const capBase = capBaseRaw ? Number(capBaseRaw) : null;

@@ -9,7 +9,7 @@ import {
   uploadProductImageAction,
 } from "./actions";
 
-type Category = { id: string; name: string; sort_order: number };
+type Category = { id: string; name: string; sort_order: number; default_station?: "kitchen" | "bar" };
 type Product = {
   id: string;
   category_id: string | null;
@@ -19,7 +19,10 @@ type Product = {
   price: number;
   status: string;
   image_url: string | null;
+  station?: "kitchen" | "bar";
 };
+
+const STATION_LABEL: Record<string, string> = { kitchen: "🍳 Dapur (Kitchen)", bar: "🍹 Bar" };
 
 export default function MenuManagerClient({
   categories,
@@ -55,10 +58,15 @@ export default function MenuManagerClient({
       {/* CATEGORIES */}
       <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
         <h2 className="font-heading text-xl text-primary mb-4">Kategori</h2>
+        <p className="text-xs text-text-muted mb-3">
+          "Stasiun" menentukan ke mana pesanan dikonfirmasi: pesanan makanan masuk ke papan Dapur,
+          pesanan minuman masuk ke papan Bar. Produk baru di kategori ini otomatis mengikuti
+          stasiun default-nya (bisa diubah per-produk di bawah).
+        </p>
         <ul className="mb-4 flex flex-wrap gap-2">
           {categories.map((c) => (
             <li key={c.id} className="px-3 py-1.5 rounded-full bg-background dark:bg-background-dark border border-border text-sm">
-              {c.name}
+              {c.name} <span className="text-text-muted">· {STATION_LABEL[c.default_station ?? "kitchen"]}</span>
             </li>
           ))}
         </ul>
@@ -72,6 +80,14 @@ export default function MenuManagerClient({
             required
             className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark"
           />
+          <select
+            name="defaultStation"
+            defaultValue="kitchen"
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+          >
+            <option value="kitchen">🍳 Dapur (Kitchen)</option>
+            <option value="bar">🍹 Bar</option>
+          </select>
           <input type="hidden" name="sortOrder" value={categories.length + 1} />
           <button
             type="submit"
@@ -125,6 +141,14 @@ export default function MenuManagerClient({
                       </option>
                     ))}
                   </select>
+                  <select
+                    name="station"
+                    defaultValue={p.station ?? "kitchen"}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+                  >
+                    <option value="kitchen">🍳 Konfirmasi ke Dapur (Kitchen)</option>
+                    <option value="bar">🍹 Konfirmasi ke Bar</option>
+                  </select>
                   <div className="col-span-2 flex gap-2">
                     <button
                       type="submit"
@@ -163,7 +187,9 @@ export default function MenuManagerClient({
                           <span className="ml-2 text-xs text-danger">Nonaktif</span>
                         )}
                       </p>
-                      <p className="text-text-muted text-sm">Rp {p.price.toLocaleString("id-ID")}</p>
+                      <p className="text-text-muted text-sm">
+                        Rp {p.price.toLocaleString("id-ID")} · {STATION_LABEL[p.station ?? "kitchen"]}
+                      </p>
                       <form
                         action={(fd) =>
                           handleAction(() => uploadProductImageAction(fd), `Foto ${p.name} diperbarui.`)

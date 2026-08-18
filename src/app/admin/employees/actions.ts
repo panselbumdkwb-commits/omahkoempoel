@@ -31,13 +31,15 @@ export async function createEmployeeAction(formData: FormData) {
 
 export async function updateEmployeeAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
+  const employeeCode = String(formData.get("employeeCode") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const positionId = String(formData.get("positionId") ?? "");
   const basicSalary = Number(formData.get("basicSalary") ?? 0);
 
   if (!id) throw new Error("ID pegawai tidak valid.");
-  await employeeService.updateEmployee(id, { fullName, phone, positionId, basicSalary });
+  if (!employeeCode) throw new Error("Kode pegawai wajib diisi.");
+  await employeeService.updateEmployee(id, { employeeCode, fullName, phone, positionId, basicSalary });
   revalidatePath("/admin/employees");
 }
 
@@ -45,6 +47,15 @@ export async function toggleEmployeeStatusAction(id: string, currentStatus: stri
   const next = currentStatus === "active" ? "inactive" : "active";
   await employeeService.setEmployeeStatus(id, next as "active" | "inactive");
   revalidatePath("/admin/employees");
+}
+
+/** Hapus data pegawai (soft-delete — lihat employeeService.deleteEmployee).
+ * Hanya boleh dipanggil oleh Owner/Admin, ditegakkan oleh RLS di database. */
+export async function deleteEmployeeAction(id: string) {
+  if (!id) throw new Error("ID pegawai tidak valid.");
+  await employeeService.deleteEmployee(id);
+  revalidatePath("/admin/employees");
+  revalidatePath("/admin/schedule");
 }
 
 export async function setEmployeePinAction(formData: FormData) {
@@ -60,6 +71,7 @@ export async function recordAttendanceAction(formData: FormData) {
   const status = String(formData.get("status") ?? "present") as any;
   const clockIn = String(formData.get("clockIn") ?? "");
   const clockOut = String(formData.get("clockOut") ?? "");
+  const lateMinutes = Number(formData.get("lateMinutes") ?? 0);
 
   if (!employeeId || !date) throw new Error("Pegawai dan tanggal wajib diisi.");
 
@@ -69,6 +81,7 @@ export async function recordAttendanceAction(formData: FormData) {
     status,
     clockIn: clockIn ? new Date(`${date}T${clockIn}:00`).toISOString() : null,
     clockOut: clockOut ? new Date(`${date}T${clockOut}:00`).toISOString() : null,
+    lateMinutes: Number.isFinite(lateMinutes) ? lateMinutes : 0,
   });
   revalidatePath("/admin/attendance");
 }

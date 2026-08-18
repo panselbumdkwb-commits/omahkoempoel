@@ -11,13 +11,15 @@ type AttendanceRow = {
   clock_out: string | null;
   status: string;
   notes: string | null;
+  late_minutes?: number | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
   present: "Hadir",
   late: "Terlambat",
   absent: "Tidak Hadir",
-  leave: "Cuti/Izin",
+  leave: "Ijin",
+  sick: "Sakit",
   early_leave: "Pulang Cepat",
 };
 
@@ -56,6 +58,10 @@ export default function AttendanceClient({
         </a>{" "}
         (pegawai perlu PIN — atur lewat halaman Pegawai).
       </p>
+      <p className="text-xs text-text-muted">
+        Potongan otomatis di payroll: Ijin −Rp30.000/hari, Sakit −Rp20.000/hari, Terlambat
+        −Rp5.000 per akumulasi 60 menit (isi kolom "Menit Telat" di bawah saat status Terlambat).
+      </p>
 
       {message && (
         <div className="rounded-md bg-surface dark:bg-surface-dark border border-border p-3 text-sm">
@@ -72,7 +78,7 @@ export default function AttendanceClient({
               <form
                 key={e.id}
                 action={submitAttendance}
-                className="p-4 grid grid-cols-2 sm:grid-cols-5 gap-2 items-center"
+                className="p-4 grid grid-cols-2 sm:grid-cols-6 gap-2 items-center"
               >
                 <input type="hidden" name="employeeId" value={e.id} />
                 <input type="hidden" name="date" value={date} />
@@ -98,6 +104,14 @@ export default function AttendanceClient({
                   type="time"
                   name="clockOut"
                   defaultValue={existing?.clock_out ? existing.clock_out.slice(11, 16) : ""}
+                  className="border border-border rounded-md p-1.5 text-sm bg-background dark:bg-background-dark"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  name="lateMinutes"
+                  defaultValue={existing?.late_minutes ?? ""}
+                  placeholder="Menit Telat"
                   className="border border-border rounded-md p-1.5 text-sm bg-background dark:bg-background-dark"
                 />
                 <button

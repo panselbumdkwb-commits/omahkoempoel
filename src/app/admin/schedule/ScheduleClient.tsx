@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { upsertScheduleEntryAction } from "./actions";
+import { upsertScheduleEntryAction, generateAutoScheduleAction } from "./actions";
 
 // Ditampilkan Senin dulu (lebih lazim di jadwal kerja), walau di database
 // day_of_week 0 = Minggu (konvensi ISO/JS Date.getDay()).
@@ -22,6 +22,7 @@ const SHIFT_PRESETS = [
   { id: "shift1", label: "Shift 1 (09:00–17:00)", start: "09:00", end: "17:00" },
   { id: "shift2", label: "Shift 2 (16:00–24:00)", start: "16:00", end: "00:00" },
   { id: "shift3", label: "Shift 3 – Cadangan (13:00–21:00)", start: "13:00", end: "21:00" },
+  { id: "shiftmalam", label: "Shift Malam (23:00–07:00) – Sekuriti", start: "23:00", end: "07:00" },
   { id: "custom", label: "Kustom (atur manual)", start: "", end: "" },
 ] as const;
 
@@ -74,6 +75,29 @@ export default function ScheduleClient({
   const [state, setState] = useState(() => buildInitialState(employees, initialSchedule));
   const [isPending, startTransition] = useTransition();
   const [savedStatus, setSavedStatus] = useState<Record<string, string>>({});
+  const [autoResult, setAutoResult] = useState<{
+    entriesWritten: number;
+    warnings: string[];
+    summary: { position: string; employeeCount: number; note: string }[];
+  } | null>(null);
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
+
+  function runAutoGenerate() {
+    const ok = window.confirm(
+      "Susun ulang jadwal shift otomatis untuk semua pegawai Kasir/Bar/Kitchen/Waitres/Kapten/Sekuriti berdasarkan jabatan saat ini? Ini akan MENIMPA jadwal mereka yang sudah ada."
+    );
+    if (!ok) return;
+    setAutoMessage(null);
+    startTransition(async () => {
+      try {
+        const result = await generateAutoScheduleAction();
+        setAutoResult(result);
+        setAutoMessage(`Jadwal otomatis tersusun (${result.entriesWritten} entri). Muat ulang halaman untuk melihat hasilnya di grid.`);
+      } catch (err: any) {
+        setAutoMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
 
   function selectShift(employeeId: string, day: number, value: string) {
     setState((prev) => {
@@ -151,8 +175,8 @@ export default function ScheduleClient({
       <div>
         <h2 className="font-heading text-2xl text-primary">Jadwal Kerja Pegawai</h2>
         <p className="text-sm text-text-muted mt-1">
-          Pilih shift per hari untuk tiap pegawai. Tersedia 3 shift baku: 2 shift utama + 1 shift
-          cadangan, atau pilih "Kustom" untuk atur jam manual.
+          Pilih shift per hari untuk tiap pegawai. Tersedia 4 shift baku, atau pilih "Kustom" untuk
+          atur jam manual.
         </p>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {SHIFT_PRESETS.filter((p) => p.id !== "custom").map((p) => (
@@ -161,6 +185,52 @@ export default function ScheduleClient({
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-primary">Generate Jadwal Otomatis</p>
+            <p className="text-xs text-text-muted mt-1 max-w-xl">
+              Susun jadwal shift untuk semua jabatan (Kasir, Bar, Kitchen, Waitres) sekaligus dari
+              data pegawai aktif saat ini: 6 hari kerja/1 libur bergantian (libur tidak pernah di
+              akhir pekan), Kasir di-backup Kapten saat libur, Kapten tanpa jam tetap, Sekuriti
+              selalu Shift Malam.
+            </p>
+          </div>
+          <button
+            onClick={runAutoGenerate}
+            disabled={isPending}
+            className="shrink-0 bg-primary text-white px-4 py-2 rounded-md font-semibold disabled:opacity-50"
+          >
+            🔄 Generate Otomatis
+          </button>
+        </div>
+        {autoMessage && <p className="text-sm mt-3">{autoMessage}</p>}
+        {autoResult && (
+          <div className="mt-3 space-y-2 text-sm">
+            {autoResult.summary.length > 0 && (
+              <ul className="list-disc list-inside text-text-muted">
+                {autoResult.summary.map((s) => (
+                  <li key={s.position}>
+                    <span className="font-semibold text-text">{s.position}</span> ({s.employeeCount}{" "}
+                    pegawai) — {s.note}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {autoResult.warnings.length > 0 && (
+              <div className="rounded-md bg-batik-gold/10 border border-batik-gold/40 p-2">
+                <p className="font-semibold text-xs mb-1">⚠️ Perlu perhatian:</p>
+                <ul className="list-disc list-inside text-xs text-text-muted">
+                  {autoResult.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">

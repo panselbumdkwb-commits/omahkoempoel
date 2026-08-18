@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-export type KitchenOrder = {
+export type BarOrder = {
   id: string;
   order_number: string;
   order_type: string;
@@ -18,16 +18,19 @@ export type KitchenOrder = {
   }[];
 };
 
-/** Papan pesanan untuk dapur: order dari status NEW s/d READY (sebelum
- * SERVED). Order yang sudah SERVED/PAID/CLOSED tidak lagi relevan untuk
- * dapur, jadi tidak ditampilkan di sini (tetap terlihat di /pos).
+/** Papan pesanan untuk Bar: sama seperti kitchenService.listKitchenBoard(),
+ * tapi khusus item dengan products.station = 'bar' (minuman). Order yang
+ * murni berisi makanan (tanpa minuman) otomatis tidak muncul di sini.
  *
- * Hanya item dengan products.station = 'kitchen' yang ikut ditampilkan
- * (pesanan makanan) — item minuman dalam order yang sama dikonfirmasi
- * terpisah ke papan Bar lewat barService.listBarBoard(). Order yang
- * TIDAK punya item makanan sama sekali (murni minuman) otomatis tidak
- * muncul di sini berkat `order_items!inner(...)` + filter station. */
-export async function listKitchenBoard(): Promise<KitchenOrder[]> {
+ * CATATAN DESAIN: status order (NEW/CONFIRMED/PROCESSING/READY/SERVED)
+ * adalah 1 kolom bersama di tabel `orders`, dipakai bareng oleh Dapur,
+ * Bar, dan Kasir — bukan status terpisah per item. Untuk order campuran
+ * (ada makanan & minuman sekaligus), kedua tim (Dapur & Bar) sama-sama
+ * bisa melihat & mengubah status order tersebut; koordinasikan siapa
+ * yang menandai "Siap" terakhir. Kalau ke depan volume order campuran
+ * banyak dan butuh status per station terpisah, perlu kolom status baru
+ * di order_items (perubahan skema terpisah, belum dibuat di sini). */
+export async function listBarBoard(): Promise<BarOrder[]> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("orders")
@@ -35,10 +38,10 @@ export async function listKitchenBoard(): Promise<KitchenOrder[]> {
       "id, order_number, order_type, status, created_at, customer_name, tables(number), order_items!inner(id, quantity, notes, products!inner(name, station), order_item_modifiers(name))"
     )
     .in("status", ["NEW", "CONFIRMED", "PROCESSING", "READY"])
-    .eq("order_items.products.station", "kitchen")
+    .eq("order_items.products.station", "bar")
     .order("created_at", { ascending: true });
-  if (error) throw new Error(`Gagal memuat papan dapur: ${error.message}`);
-  return (data ?? []) as unknown as KitchenOrder[];
+  if (error) throw new Error(`Gagal memuat papan Bar: ${error.message}`);
+  return (data ?? []) as unknown as BarOrder[];
 }
 
 export async function advanceOrderStatus(

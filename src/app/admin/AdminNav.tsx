@@ -45,6 +45,12 @@ export default function AdminNav({ role }: { role: string | null }) {
       <Link href="/admin/qr-meja" className={linkClass("/admin/qr-meja")}>
         QR Meja
       </Link>
+      <Link href="/kitchen" className={linkClass("/kitchen")} target="_blank">
+        Papan Dapur
+      </Link>
+      <Link href="/bar" className={linkClass("/bar")} target="_blank">
+        Papan Bar
+      </Link>
       {role === "SUPER_ADMIN" && (
         <Link href="/admin/users" className={linkClass("/admin/users")}>
           Kelola User

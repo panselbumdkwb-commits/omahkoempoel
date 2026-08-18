@@ -1,6 +1,8 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
+export type Station = "kitchen" | "bar";
+
 export type ProductInput = {
   categoryId: string;
   sku: string;
@@ -9,6 +11,9 @@ export type ProductInput = {
   price: number;
   prepTimeMinutes?: number;
   imageUrl?: string;
+  /** Tujuan konfirmasi pesanan: 'kitchen' (makanan) atau 'bar' (minuman).
+   * Kalau tidak diisi, ikut default_station kategori yang dipilih. */
+  station?: Station;
 };
 
 /** Semua fungsi di sini memakai session client (bukan admin) sehingga
@@ -20,27 +25,27 @@ export async function listCatalog() {
   const supabase = createSupabaseServerClient();
   const { data: categories, error: catError } = await supabase
     .from("categories")
-    .select("id, name, sort_order")
+    .select("id, name, sort_order, default_station")
     .order("sort_order");
   if (catError) throw new Error(`Gagal memuat kategori: ${catError.message}`);
 
   const { data: products, error: prodError } = await supabase
     .from("products")
-    .select("id, category_id, sku, name, description, price, status, image_url")
+    .select("id, category_id, sku, name, description, price, status, image_url, station")
     .order("name");
   if (prodError) throw new Error(`Gagal memuat produk: ${prodError.message}`);
 
   return { categories: categories ?? [], products: products ?? [] };
 }
 
-export async function createCategory(name: string, sortOrder: number) {
+export async function createCategory(name: string, sortOrder: number, defaultStation: Station = "kitchen") {
   const supabase = createSupabaseServerClient();
   const { data: business } = await supabase.from("business").select("id").limit(1).single();
   if (!business) throw new Error("Business tidak ditemukan.");
 
   const { error } = await supabase
     .from("categories")
-    .insert({ business_id: business.id, name, sort_order: sortOrder });
+    .insert({ business_id: business.id, name, sort_order: sortOrder, default_station: defaultStation });
   if (error) throw new Error(`Gagal menambah kategori: ${error.message}`);
 }
 
@@ -51,6 +56,19 @@ export async function createProduct(input: ProductInput) {
 
   if (input.price < 0) throw new Error("Harga tidak boleh negatif.");
 
+  // Kalau station tidak diisi eksplisit, ikuti default_station kategori
+  // yang dipilih — supaya makanan otomatis ke Dapur & minuman ke Bar
+  // tanpa Admin perlu set manual setiap tambah produk baru.
+  let station: Station = input.station ?? "kitchen";
+  if (!input.station) {
+    const { data: category } = await supabase
+      .from("categories")
+      .select("default_station")
+      .eq("id", input.categoryId)
+      .maybeSingle();
+    if (category?.default_station) station = category.default_station as Station;
+  }
+
   const { error } = await supabase.from("products").insert({
     business_id: business.id,
     category_id: input.categoryId,
@@ -60,6 +78,7 @@ export async function createProduct(input: ProductInput) {
     price: input.price,
     prep_time_minutes: input.prepTimeMinutes ?? null,
     image_url: input.imageUrl ?? null,
+    station,
   });
   if (error) throw new Error(`Gagal menambah produk: ${error.message}`);
 }
@@ -72,6 +91,7 @@ export async function updateProduct(
     price: number;
     categoryId: string;
     imageUrl: string;
+    station: Station;
   }>
 ) {
   const supabase = createSupabaseServerClient();
@@ -87,6 +107,7 @@ export async function updateProduct(
       ...(updates.price !== undefined && { price: updates.price }),
       ...(updates.categoryId !== undefined && { category_id: updates.categoryId }),
       ...(updates.imageUrl !== undefined && { image_url: updates.imageUrl }),
+      ...(updates.station !== undefined && { station: updates.station }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

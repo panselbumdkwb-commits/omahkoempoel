@@ -34,6 +34,8 @@ export default function LoginForm({ showDateTimeClock }: { showDateTimeClock: bo
       router.push("/admin");
     } else if (role === "KITCHEN") {
       router.push("/kitchen");
+    } else if (role === "BAR") {
+      router.push("/bar");
     } else {
       router.push("/pos");
     }

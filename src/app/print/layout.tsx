@@ -6,7 +6,7 @@ export default async function PrintLayout({ children }: { children: React.ReactN
   if (!user) redirect("/login");
 
   const role = await getCurrentRole();
-  if (!role || !["SUPER_ADMIN", "OWNER", "KASIR", "FRONT_SERVE", "KITCHEN"].includes(role)) {
+  if (!role || !["SUPER_ADMIN", "OWNER", "KASIR", "FRONT_SERVE", "KITCHEN", "BAR"].includes(role)) {
     redirect("/pos");
   }
 

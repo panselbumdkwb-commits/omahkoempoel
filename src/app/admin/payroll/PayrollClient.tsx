@@ -10,11 +10,20 @@ import {
   approvePayrollPeriodAction,
 } from "./actions";
 
+type CalcType =
+  | "fixed"
+  | "percent_of_basic"
+  | "per_day_present"
+  | "deduction_per_leave_day"
+  | "deduction_per_sick_day"
+  | "deduction_per_late_block"
+  | "revenue_bonus_share";
+
 type Component = {
   id: string;
   name: string;
   component_type: "earning" | "deduction";
-  calc_type: "fixed" | "percent_of_basic";
+  calc_type: CalcType;
   value: number;
   cap_base: number | null;
   is_active: boolean;
@@ -23,6 +32,37 @@ type Period = { id: string; period_start: string; period_end: string; status: st
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
+}
+
+const CALC_TYPE_OPTIONS: { value: CalcType; label: string }[] = [
+  { value: "fixed", label: "Nominal Tetap (Rp/bulan)" },
+  { value: "percent_of_basic", label: "Persen dari Gaji Pokok" },
+  { value: "per_day_present", label: "Rp per hari hadir (kompensasi makan harian)" },
+  { value: "deduction_per_leave_day", label: "Potongan Rp per hari Ijin" },
+  { value: "deduction_per_sick_day", label: "Potongan Rp per hari Sakit" },
+  { value: "deduction_per_late_block", label: "Potongan Rp per akumulasi 60 menit terlambat" },
+  { value: "revenue_bonus_share", label: "Bonus % dari (Omset bulan − ambang di Batas Upah)" },
+];
+
+function describeComponent(c: Component) {
+  switch (c.calc_type) {
+    case "fixed":
+      return formatRupiah(c.value) + "/bulan";
+    case "percent_of_basic":
+      return `${c.value}% dari gaji pokok${c.cap_base ? ` (maks upah ${formatRupiah(c.cap_base)})` : ""}`;
+    case "per_day_present":
+      return `${formatRupiah(c.value)} x jumlah hari hadir`;
+    case "deduction_per_leave_day":
+      return `${formatRupiah(c.value)} x jumlah hari Ijin`;
+    case "deduction_per_sick_day":
+      return `${formatRupiah(c.value)} x jumlah hari Sakit`;
+    case "deduction_per_late_block":
+      return `${formatRupiah(c.value)} per akumulasi 60 menit terlambat`;
+    case "revenue_bonus_share":
+      return `${c.value}% dari (Omset bulan − ${formatRupiah(c.cap_base ?? 0)}), dibagi rata, min. Rp200.000/orang`;
+    default:
+      return "";
+  }
 }
 
 export default function PayrollClient({ components, periods }: { components: Component[]; periods: Period[] }) {
@@ -72,9 +112,7 @@ export default function PayrollClient({ components, periods }: { components: Com
                 <span className={c.component_type === "earning" ? "text-success" : "text-danger"}>
                   {c.component_type === "earning" ? "+" : "−"}
                 </span>{" "}
-                {c.name} —{" "}
-                {c.calc_type === "fixed" ? formatRupiah(c.value) : `${c.value}% dari gaji pokok`}
-                {c.cap_base && ` (maks upah ${formatRupiah(c.cap_base)})`}
+                {c.name} — {describeComponent(c)}
                 {!c.is_active && <span className="ml-2 text-xs text-text-muted">(nonaktif)</span>}
               </div>
               <button
@@ -93,12 +131,20 @@ export default function PayrollClient({ components, periods }: { components: Com
             <option value="earning">Penambah (Earning)</option>
             <option value="deduction">Potongan (Deduction)</option>
           </select>
-          <select name="calcType" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark">
-            <option value="fixed">Nominal Tetap (Rp)</option>
-            <option value="percent_of_basic">Persen dari Gaji Pokok</option>
+          <select name="calcType" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2">
+            {CALC_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
           <input name="value" type="number" step="0.01" placeholder="Nilai (Rp atau %)" required className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
-          <input name="capBase" type="number" placeholder="Batas upah dasar (opsional)" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
+          <input
+            name="capBase"
+            type="number"
+            placeholder="Batas upah dasar / ambang omset (opsional)"
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+          />
           <button type="submit" className="bg-primary text-white py-2 rounded-md font-semibold col-span-2">
             Tambah Komponen
           </button>

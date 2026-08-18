@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   createPositionAction,
   createEmployeeAction,
   updateEmployeeAction,
   toggleEmployeeStatusAction,
   setEmployeePinAction,
+  deleteEmployeeAction,
 } from "./actions";
 
 type Position = { id: string; name: string };
@@ -41,6 +42,8 @@ export default function EmployeesClient({
   const [pinEditId, setPinEditId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [filterPositionId, setFilterPositionId] = useState<string>("");
+  const [search, setSearch] = useState("");
 
   function handleAction(action: () => Promise<void>, successMsg: string) {
     startTransition(async () => {
@@ -53,6 +56,28 @@ export default function EmployeesClient({
       }
     });
   }
+
+  function handleDelete(e: Employee) {
+    const ok = window.confirm(
+      `Hapus data pegawai "${e.full_name}" (${e.employee_code})? Data absensi & slip gaji lama tetap tersimpan untuk riwayat, tapi pegawai ini akan hilang dari daftar & jadwal kerja.`
+    );
+    if (!ok) return;
+    handleAction(() => deleteEmployeeAction(e.id), `${e.full_name} dihapus dari daftar pegawai.`);
+  }
+
+  // Filter jabatan + pencarian nama/kode pegawai — supaya Owner/Admin
+  // gampang menemukan pegawai tertentu tanpa scroll seluruh daftar.
+  const filteredEmployees = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return employees.filter((e) => {
+      if (filterPositionId && e.position_id !== filterPositionId) return false;
+      if (!q) return true;
+      return (
+        (e.full_name ?? "").toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(q)
+      );
+    });
+  }, [employees, filterPositionId, search]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -106,8 +131,37 @@ export default function EmployeesClient({
       <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
         <h2 className="font-heading text-xl text-primary mb-4">Data Pegawai</h2>
 
+        {/* FILTER JABATAN + PENCARIAN — memudahkan mencari & mengedit data
+            pegawai tanpa scroll seluruh daftar. */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <select
+            value={filterPositionId}
+            onChange={(e) => setFilterPositionId(e.target.value)}
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm sm:w-56"
+          >
+            <option value="">Semua Jabatan</option>
+            {positions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama atau kode pegawai..."
+            className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+          />
+        </div>
+        <p className="text-xs text-text-muted mb-3">
+          Menampilkan {filteredEmployees.length} dari {employees.length} pegawai.
+        </p>
+
+        {filteredEmployees.length === 0 && (
+          <p className="text-sm text-text-muted py-4">Tidak ada pegawai yang cocok dengan filter/pencarian ini.</p>
+        )}
         <div className="divide-y divide-border">
-          {employees.map((e) => (
+          {filteredEmployees.map((e) => (
             <div key={e.id} className="py-3">
               {editingId === e.id ? (
                 <form
@@ -115,6 +169,13 @@ export default function EmployeesClient({
                   className="grid grid-cols-2 gap-2"
                 >
                   <input type="hidden" name="id" value={e.id} />
+                  <input
+                    name="employeeCode"
+                    defaultValue={e.employee_code}
+                    required
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+                    placeholder="Kode pegawai (mis. EMP-002)"
+                  />
                   <input
                     name="fullName"
                     defaultValue={e.full_name ?? ""}
@@ -195,6 +256,13 @@ export default function EmployeesClient({
                       className="text-sm px-3 py-1.5 rounded-md border border-border"
                     >
                       {e.status === "active" ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(e)}
+                      disabled={isPending}
+                      className="text-sm px-3 py-1.5 rounded-md border border-danger text-danger disabled:opacity-50"
+                    >
+                      Hapus
                     </button>
                   </div>
                 </div>
