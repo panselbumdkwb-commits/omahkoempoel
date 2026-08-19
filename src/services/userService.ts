@@ -72,6 +72,42 @@ export async function updateUserRole(profileId: string, roleId: string) {
   if (error) throw new Error(`Gagal mengubah role: ${error.message}`);
 }
 
+/**
+ * Edit data dasar user (nama & role sekaligus) dari Kelola User.
+ * roleId opsional supaya bisa dipanggil dari form yang cuma mengubah
+ * nama tanpa harus mengirim ulang role yang sudah ada.
+ */
+export async function updateUserProfile(
+  profileId: string,
+  input: { fullName: string; roleId?: string }
+) {
+  if (!input.fullName.trim()) throw new Error("Nama tidak boleh kosong.");
+
+  const supabase = createSupabaseServerClient();
+  const payload: Record<string, string> = { full_name: input.fullName.trim() };
+  if (input.roleId) payload.role_id = input.roleId;
+
+  const { error } = await supabase.from("profiles").update(payload).eq("id", profileId);
+  if (error) throw new Error(`Gagal menyimpan perubahan user: ${error.message}`);
+}
+
+/**
+ * Reset password akun staf. Sama seperti createUserAccount, ini butuh
+ * service role (supabaseAdmin) karena mengubah password Supabase Auth
+ * bukan hal yang bisa dilakukan lewat client biasa / RLS. profiles.id
+ * selalu sama dengan auth user id (lihat createUserAccount di atas),
+ * jadi profileId bisa langsung dipakai sebagai target user id.
+ */
+export async function resetUserPassword(profileId: string, newPassword: string) {
+  if (newPassword.length < 8) {
+    throw new Error("Password minimal 8 karakter.");
+  }
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(profileId, {
+    password: newPassword,
+  });
+  if (error) throw new Error(`Gagal mereset password: ${error.message}`);
+}
+
 export async function setUserStatus(profileId: string, status: "active" | "suspended") {
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("profiles").update({ status }).eq("id", profileId);
