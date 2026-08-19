@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createUserAction, updateUserRoleAction, toggleUserStatusAction } from "./actions";
+import {
+  createUserAction,
+  updateUserRoleAction,
+  toggleUserStatusAction,
+  updateUserProfileAction,
+  resetUserPasswordAction,
+} from "./actions";
 
 type Role = { id: string; code: string; name: string };
 type UserRow = {
@@ -30,6 +36,7 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
   const [message, setMessage] = useState<string | null>(null);
   const [generatedPassword, setGeneratedPassword] = useState(generatePassword());
   const [isPending, startTransition] = useTransition();
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
   function handleCreate(fd: FormData) {
     startTransition(async () => {
@@ -124,23 +131,12 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
                 <p className="text-sm text-text-muted">{roleName(u)}</p>
               </div>
               <div className="flex gap-2 items-center">
-                <form action={(fd) => startTransition(() => updateUserRoleAction(fd))} className="flex gap-2">
-                  <input type="hidden" name="profileId" value={u.id} />
-                  <select
-                    name="roleId"
-                    defaultValue={roles.find((r) => r.code === (Array.isArray(u.roles) ? u.roles[0]?.code : u.roles?.code))?.id ?? ""}
-                    className="text-sm border border-border rounded-md p-1.5 bg-background dark:bg-background-dark"
-                  >
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.code}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="submit" className="text-xs px-2 py-1.5 rounded-md border border-border">
-                    Ubah Role
-                  </button>
-                </form>
+                <button
+                  onClick={() => setEditingUser(u)}
+                  className="text-xs px-2 py-1.5 rounded-md border border-border font-semibold text-primary"
+                >
+                  Edit
+                </button>
                 <button
                   onClick={() => startTransition(() => toggleUserStatusAction(u.id, u.status))}
                   className="text-xs px-2 py-1.5 rounded-md border border-border"
@@ -152,6 +148,136 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
           ))}
         </div>
       </section>
+
+      {editingUser && (
+        <EditUserModal user={editingUser} roles={roles} onClose={() => setEditingUser(null)} />
+      )}
+    </div>
+  );
+}
+
+function EditUserModal({
+  user,
+  roles,
+  onClose,
+}: {
+  user: UserRow;
+  roles: Role[];
+  onClose: () => void;
+}) {
+  const currentRoleCode = Array.isArray(user.roles) ? user.roles[0]?.code : user.roles?.code;
+  const [fullName, setFullName] = useState(user.full_name);
+  const [roleId, setRoleId] = useState(roles.find((r) => r.code === currentRoleCode)?.id ?? "");
+  const [newPassword, setNewPassword] = useState("");
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function saveProfile() {
+    const fd = new FormData();
+    fd.set("profileId", user.id);
+    fd.set("fullName", fullName);
+    fd.set("roleId", roleId);
+    startTransition(async () => {
+      try {
+        await updateUserProfileAction(fd);
+        setProfileMsg("Nama & role tersimpan.");
+      } catch (err: any) {
+        setProfileMsg(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function savePassword() {
+    if (newPassword.length < 8) {
+      setPasswordMsg("Password minimal 8 karakter.");
+      return;
+    }
+    const fd = new FormData();
+    fd.set("profileId", user.id);
+    fd.set("newPassword", newPassword);
+    startTransition(async () => {
+      try {
+        await resetUserPasswordAction(fd);
+        setPasswordMsg(`Password berhasil direset ke: ${newPassword} (catat sekarang, berikan ke pegawai secara langsung/aman).`);
+      } catch (err: any) {
+        setPasswordMsg(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center sm:justify-center bg-black/50">
+      <div className="w-full sm:max-w-md bg-surface dark:bg-surface-dark rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="p-5 flex justify-between items-center border-b border-border">
+          <h3 className="font-heading text-lg text-primary">Edit User</h3>
+          <button onClick={onClose} className="text-sm text-text-muted">
+            Tutup
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Nama & Role</p>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Nama lengkap"
+              className="w-full border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+            />
+            <select
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value)}
+              className="w-full border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+            >
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.code})
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={saveProfile}
+              disabled={isPending}
+              className="w-full bg-primary text-white py-2 rounded-md font-semibold disabled:opacity-50"
+            >
+              Simpan Nama & Role
+            </button>
+            {profileMsg && <p className="text-xs text-text-muted">{profileMsg}</p>}
+          </div>
+
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-sm font-semibold">Reset Password</p>
+            <div className="flex gap-2">
+              <input
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Password baru (min. 8 karakter)"
+                className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark font-mono text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setNewPassword(generatePassword())}
+                className="text-xs px-3 py-2 rounded-md border border-border"
+              >
+                Acak
+              </button>
+            </div>
+            <button
+              onClick={savePassword}
+              disabled={isPending}
+              className="w-full bg-secondary text-white py-2 rounded-md font-semibold disabled:opacity-50"
+            >
+              Reset Password
+            </button>
+            {passwordMsg && <p className="text-xs text-text-muted">{passwordMsg}</p>}
+            <p className="text-xs text-text-muted">
+              Password baru tidak disimpan dalam bentuk yang bisa ditampilkan ulang — catat &amp;
+              sampaikan ke pegawai sekarang juga.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

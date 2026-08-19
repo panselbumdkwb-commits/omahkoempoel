@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase-browser";
 import {
   getOrderDetailAction,
   updateCustomerNameAction,
@@ -11,6 +13,7 @@ import {
   listClosedOrdersAction,
 } from "./actions";
 import PosClient from "./PosClient";
+import OrderNotifications from "@/components/OrderNotifications";
 
 type OpenOrder = {
   id: string;
@@ -62,12 +65,21 @@ export default function OrderQueueClient({
   tables: TableRow[];
   paymentMethods: PaymentMethod[];
 }) {
-  const [orders] = useState<OpenOrder[]>(initialOrders);
+  const router = useRouter();
+  // Sinkron dengan initialOrders setiap kali server component mengirim
+  // props baru (dipicu oleh router.refresh() dari langganan realtime di
+  // bawah) — sebelumnya di-capture sekali lewat useState() saja sehingga
+  // "Order Masuk" tidak pernah update otomatis walau ada order baru.
+  const [orders, setOrders] = useState<OpenOrder[]>(initialOrders);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [activeTab, setActiveTab] = useState<"masuk" | "riwayat">("masuk");
   const [closedOrders, setClosedOrders] = useState<OpenOrder[] | null>(null);
   const [loadingClosed, setLoadingClosed] = useState(false);
+
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   useEffect(() => {
     if (activeTab === "riwayat" && closedOrders === null) {
@@ -77,6 +89,26 @@ export default function OrderQueueClient({
         .finally(() => setLoadingClosed(false));
     }
   }, [activeTab, closedOrders]);
+
+  // Realtime: begitu ada order baru / berubah status (dari pelanggan
+  // lewat menu digital, atau dari Dapur/Bar), refresh data server supaya
+  // daftar "Order Masuk" & modal detail selalu ikut yang terbaru. Kalau
+  // sedang lihat tab Riwayat, refetch riwayat juga supaya konsisten.
+  useEffect(() => {
+    const channel = supabase
+      .channel("pos-order-queue")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        router.refresh();
+        if (activeTab === "riwayat") {
+          listClosedOrdersAction().then((data) => setClosedOrders(data as OpenOrder[]));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [router, activeTab]);
 
   if (showNewOrder) {
     return (
@@ -103,6 +135,14 @@ export default function OrderQueueClient({
 
   return (
     <div className="max-w-3xl mx-auto p-4">
+      <OrderNotifications
+        orders={orders.map((o) => ({
+          id: o.id,
+          status: o.status,
+          order_number: o.order_number,
+          label: tableLabel(o),
+        }))}
+      />
       <div className="flex justify-between items-center mb-4">
         <h2 className="font-heading text-xl text-primary">
           {activeTab === "masuk" ? "Order Masuk" : "Riwayat Transaksi (Hari Ini)"}

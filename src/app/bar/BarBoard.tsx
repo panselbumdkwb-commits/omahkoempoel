@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase-browser";
 import { advanceOrderStatusAction } from "./actions";
 import type { BarOrder } from "@/services/barService";
 import DateTimeBadge from "@/components/DateTimeBadge";
+import OrderNotifications from "@/components/OrderNotifications";
 
 function tableLabel(order: BarOrder) {
   if (order.order_type === "take_away") return "Take Away";
@@ -62,6 +63,14 @@ export default function BarBoard({
 
   return (
     <div className="min-h-screen flex flex-col">
+      <OrderNotifications
+        orders={initialOrders.map((o) => ({
+          id: o.id,
+          status: o.status,
+          order_number: o.order_number,
+          label: tableLabel(o),
+        }))}
+      />
       <header className="border-b border-border px-4 py-3 flex justify-between items-center bg-surface dark:bg-surface-dark">
         <h1 className="font-heading text-xl text-primary">Omah Koempoel — Bar</h1>
         {showDateTimeClock && (
