@@ -191,7 +191,7 @@ export async function runPayroll(periodStart: string, periodEnd: string) {
 
   const { data: employees, error: empError } = await supabase
     .from("employees")
-    .select("id, basic_salary")
+    .select("id, basic_salary, employment_type, daily_rate")
     .eq("status", "active")
     .is("deleted_at", null);
   if (empError) throw new Error(`Gagal memuat pegawai aktif: ${empError.message}`);
@@ -213,6 +213,33 @@ export async function runPayroll(periodStart: string, periodEnd: string) {
   for (const emp of employees ?? []) {
     const basicSalary = Number(emp.basic_salary);
     const attendance = attendanceByEmployee.get(emp.id) ?? EMPTY_ATTENDANCE;
+
+    // Pegawai CASUAL (pengganti sementara pegawai tidak masuk) diupah
+    // HARIAN — daily_rate x jumlah hari hadir pada periode ini — dan
+    // TIDAK ikut komponen payroll standar (Tunjangan Makan/Transport,
+    // BPJS, Bonus Omset, dst), karena komponen itu ditujukan untuk
+    // pegawai tetap. basic_salary dicatat 0 di slip supaya jelas
+    // sumber upahnya murni dari baris "Upah Harian Casual".
+    if (emp.employment_type === "casual") {
+      const dailyRate = Number(emp.daily_rate);
+      const upahHarian = Math.round(dailyRate * attendance.daysPresent);
+      const earnings = [{ name: "Upah Harian Casual", amount: upahHarian }];
+
+      const { error: itemError } = await supabase.from("payroll_items").insert({
+        business_id: business.id,
+        payroll_period_id: period.id,
+        employee_id: emp.id,
+        basic_salary: 0,
+        earnings_breakdown: earnings,
+        deductions_breakdown: [],
+        gross_salary: upahHarian,
+        total_deduction: 0,
+        net_salary: upahHarian,
+      });
+      if (itemError) throw new Error(`Gagal menghitung payroll pegawai casual: ${itemError.message}`);
+      continue;
+    }
+
     const earnings = activeComponents
       .filter((c) => c.component_type === "earning")
       .map((c) => ({ name: c.name, amount: computeComponentAmount(c, basicSalary, attendance, bonusContext) }));

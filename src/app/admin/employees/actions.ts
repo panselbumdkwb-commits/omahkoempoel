@@ -5,9 +5,23 @@ import * as employeeService from "@/services/employeeService";
 
 export async function createPositionAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
+  const defaultBasicSalary = Number(formData.get("defaultBasicSalary") ?? 0);
   if (!name) throw new Error("Nama jabatan wajib diisi.");
-  await employeeService.createPosition(name);
+  await employeeService.createPosition(name, defaultBasicSalary);
   revalidatePath("/admin/employees");
+  revalidatePath("/admin/payroll");
+}
+
+/** Ubah acuan gaji pokok bulanan 1 jabatan (dipakai dari halaman Pegawai
+ * maupun halaman Payroll — keduanya menulis ke tabel employee_positions
+ * yang sama). */
+export async function updatePositionSalaryAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const defaultBasicSalary = Number(formData.get("defaultBasicSalary") ?? 0);
+  if (!id) throw new Error("Jabatan tidak valid.");
+  await employeeService.updatePositionSalary(id, defaultBasicSalary);
+  revalidatePath("/admin/employees");
+  revalidatePath("/admin/payroll");
 }
 
 export async function createEmployeeAction(formData: FormData) {
@@ -16,6 +30,8 @@ export async function createEmployeeAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const positionId = String(formData.get("positionId") ?? "");
   const basicSalary = Number(formData.get("basicSalary") ?? 0);
+  const employmentType = String(formData.get("employmentType") ?? "tetap") as "tetap" | "casual";
+  const dailyRate = Number(formData.get("dailyRate") ?? 0);
 
   if (!employeeCode || !fullName) throw new Error("Kode pegawai dan nama wajib diisi.");
 
@@ -25,6 +41,8 @@ export async function createEmployeeAction(formData: FormData) {
     phone,
     positionId: positionId || null,
     basicSalary,
+    employmentType,
+    dailyRate,
   });
   revalidatePath("/admin/employees");
 }
@@ -36,10 +54,20 @@ export async function updateEmployeeAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const positionId = String(formData.get("positionId") ?? "");
   const basicSalary = Number(formData.get("basicSalary") ?? 0);
+  const employmentType = String(formData.get("employmentType") ?? "tetap") as "tetap" | "casual";
+  const dailyRate = Number(formData.get("dailyRate") ?? 0);
 
   if (!id) throw new Error("ID pegawai tidak valid.");
   if (!employeeCode) throw new Error("Kode pegawai wajib diisi.");
-  await employeeService.updateEmployee(id, { employeeCode, fullName, phone, positionId, basicSalary });
+  await employeeService.updateEmployee(id, {
+    employeeCode,
+    fullName,
+    phone,
+    positionId,
+    basicSalary,
+    employmentType,
+    dailyRate,
+  });
   revalidatePath("/admin/employees");
 }
 

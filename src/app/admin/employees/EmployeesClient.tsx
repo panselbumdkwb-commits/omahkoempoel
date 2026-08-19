@@ -10,7 +10,7 @@ import {
   deleteEmployeeAction,
 } from "./actions";
 
-type Position = { id: string; name: string };
+type Position = { id: string; name: string; default_basic_salary: number };
 type Employee = {
   id: string;
   employee_code: string;
@@ -18,10 +18,16 @@ type Employee = {
   phone: string | null;
   position_id: string | null;
   basic_salary: number;
+  employment_type: "tetap" | "casual";
+  daily_rate: number;
   status: string;
   join_date: string;
   employee_positions: { name: string } | { name: string }[] | null;
 };
+
+function formatRupiah(n: number) {
+  return "Rp " + Math.round(n).toLocaleString("id-ID");
+}
 
 function positionName(e: Employee) {
   const p = e.employee_positions;
@@ -44,6 +50,9 @@ export default function EmployeesClient({
   const [isPending, startTransition] = useTransition();
   const [filterPositionId, setFilterPositionId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [newPositionId, setNewPositionId] = useState("");
+  const [newBasicSalary, setNewBasicSalary] = useState("");
+  const [newEmploymentType, setNewEmploymentType] = useState<"tetap" | "casual">("tetap");
 
   function handleAction(action: () => Promise<void>, successMsg: string) {
     startTransition(async () => {
@@ -51,6 +60,20 @@ export default function EmployeesClient({
         await action();
         setMessage(successMsg);
         setEditingId(null);
+      } catch (err: any) {
+        setMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function handleCreateEmployee(fd: FormData) {
+    startTransition(async () => {
+      try {
+        await createEmployeeAction(fd);
+        setMessage("Pegawai ditambahkan.");
+        setNewPositionId("");
+        setNewBasicSalary("");
+        setNewEmploymentType("tetap");
       } catch (err: any) {
         setMessage(`Gagal: ${err.message}`);
       }
@@ -104,10 +127,18 @@ export default function EmployeesClient({
               key={p.id}
               className="px-3 py-1.5 rounded-full bg-background dark:bg-background-dark border border-border text-sm"
             >
-              {p.name}
+              {p.name} <span className="text-text-muted">· {formatRupiah(p.default_basic_salary)}/bulan</span>
             </li>
           ))}
         </ul>
+        <p className="text-xs text-text-muted mb-2">
+          Gaji pokok di sini jadi acuan auto-isi saat Tambah Pegawai Baru. Untuk mengubah acuan gaji
+          pokok jabatan yang sudah ada, buka halaman{" "}
+          <a href="/admin/payroll" className="text-primary underline">
+            Payroll
+          </a>
+          .
+        </p>
         <form
           action={(fd) => handleAction(() => createPositionAction(fd), "Jabatan ditambahkan.")}
           className="flex gap-2"
@@ -117,6 +148,13 @@ export default function EmployeesClient({
             placeholder="Nama jabatan baru (mis. Kasir)"
             required
             className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+          />
+          <input
+            name="defaultBasicSalary"
+            type="number"
+            min={0}
+            placeholder="Gaji pokok"
+            className="w-36 border border-border rounded-md p-2 bg-background dark:bg-background-dark"
           />
           <button
             type="submit"
@@ -205,8 +243,24 @@ export default function EmployeesClient({
                     type="number"
                     min={0}
                     defaultValue={e.basic_salary}
-                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
                     placeholder="Gaji pokok"
+                  />
+                  <select
+                    name="employmentType"
+                    defaultValue={e.employment_type}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                  >
+                    <option value="tetap">Tetap (gaji bulanan)</option>
+                    <option value="casual">Casual (upah harian)</option>
+                  </select>
+                  <input
+                    name="dailyRate"
+                    type="number"
+                    min={0}
+                    defaultValue={e.daily_rate}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="Upah harian (khusus Casual)"
                   />
                   <div className="col-span-2 flex gap-2">
                     <button
@@ -231,9 +285,18 @@ export default function EmployeesClient({
                     <p className="font-semibold">
                       {e.full_name} <span className="text-xs text-text-muted">({e.employee_code})</span>
                       {e.status !== "active" && <span className="ml-2 text-xs text-danger">{e.status}</span>}
+                      {e.employment_type === "casual" && (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-batik-gold/20 text-batik-gold font-semibold">
+                          Casual
+                        </span>
+                      )}
                     </p>
                     <p className="text-text-muted text-sm">
-                      {positionName(e)} · Rp {Number(e.basic_salary).toLocaleString("id-ID")} · {e.phone || "-"}
+                      {positionName(e)} ·{" "}
+                      {e.employment_type === "casual"
+                        ? `${formatRupiah(e.daily_rate)}/hari`
+                        : `${formatRupiah(e.basic_salary)}/bulan`}{" "}
+                      · {e.phone || "-"}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -292,14 +355,23 @@ export default function EmployeesClient({
         </div>
 
         <h3 className="font-heading text-lg text-primary mt-6 mb-3">Tambah Pegawai Baru</h3>
-        <form
-          action={(fd) => handleAction(() => createEmployeeAction(fd), "Pegawai ditambahkan.")}
-          className="grid grid-cols-2 gap-2"
-        >
+        <form action={handleCreateEmployee} className="grid grid-cols-2 gap-2">
           <input name="employeeCode" placeholder="Kode pegawai (mis. EMP-002)" required className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
           <input name="fullName" placeholder="Nama lengkap" required className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
           <input name="phone" placeholder="No. HP" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
-          <select name="positionId" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark">
+          <select
+            name="positionId"
+            value={newPositionId}
+            onChange={(ev) => {
+              const posId = ev.target.value;
+              setNewPositionId(posId);
+              // Auto-isi gaji pokok dari acuan jabatan — tetap bisa diubah manual
+              // di input Gaji Pokok sebelum submit.
+              const pos = positions.find((p) => p.id === posId);
+              if (pos) setNewBasicSalary(String(pos.default_basic_salary));
+            }}
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+          >
             <option value="">Pilih jabatan</option>
             {positions.map((p) => (
               <option key={p.id} value={p.id}>
@@ -311,9 +383,28 @@ export default function EmployeesClient({
             name="basicSalary"
             type="number"
             min={0}
-            placeholder="Gaji pokok"
+            value={newBasicSalary}
+            onChange={(ev) => setNewBasicSalary(ev.target.value)}
+            placeholder="Gaji pokok (otomatis dari jabatan)"
             required
             className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+          />
+          <select
+            name="employmentType"
+            value={newEmploymentType}
+            onChange={(ev) => setNewEmploymentType(ev.target.value as "tetap" | "casual")}
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+          >
+            <option value="tetap">Tetap (gaji bulanan)</option>
+            <option value="casual">Casual (pengganti sementara, upah harian)</option>
+          </select>
+          <input
+            name="dailyRate"
+            type="number"
+            min={0}
+            placeholder={newEmploymentType === "casual" ? "Upah harian (wajib untuk Casual)" : "Upah harian (khusus Casual)"}
+            required={newEmploymentType === "casual"}
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
           />
           <button
             type="submit"
@@ -323,6 +414,11 @@ export default function EmployeesClient({
             Tambah Pegawai
           </button>
         </form>
+        <p className="text-xs text-text-muted mt-2">
+          Pegawai <span className="font-semibold">Casual</span> adalah pengganti sementara untuk
+          pegawai tetap yang tidak masuk — diupah harian (Upah Harian x jumlah hari hadir di periode
+          payroll), bukan gaji pokok bulanan. Catat kehadirannya seperti biasa lewat halaman Absensi.
+        </p>
         <p className="text-xs text-text-muted mt-2">
           Catatan: pegawai di sini belum tentu punya akun login. Untuk memberi akses login (mis.
           jadi Kasir di sistem), buat akun lewat Supabase Authentication lalu hubungkan manual ke

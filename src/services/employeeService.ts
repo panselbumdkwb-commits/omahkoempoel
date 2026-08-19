@@ -8,6 +8,11 @@ export type EmployeeInput = {
   positionId?: string | null;
   basicSalary: number;
   joinDate?: string;
+  /** 'tetap' (default): digaji bulanan. 'casual': pengganti sementara,
+   * diupah harian lewat dailyRate x hari hadir (lihat payrollService). */
+  employmentType?: "tetap" | "casual";
+  /** Upah per hari (Rp) — hanya dipakai kalau employmentType = 'casual'. */
+  dailyRate?: number;
 };
 
 /** Daftar pegawai. Secara default hanya yang belum dihapus (soft-delete
@@ -19,7 +24,9 @@ export async function listEmployees(params?: { positionId?: string | null }) {
   const supabase = createSupabaseServerClient();
   let query = supabase
     .from("employees")
-    .select("id, employee_code, full_name, phone, position_id, basic_salary, status, join_date, employee_positions(name)")
+    .select(
+      "id, employee_code, full_name, phone, position_id, basic_salary, employment_type, daily_rate, status, join_date, employee_positions(name)"
+    )
     .is("deleted_at", null)
     .order("full_name");
   if (params?.positionId) {
@@ -30,19 +37,42 @@ export async function listEmployees(params?: { positionId?: string | null }) {
   return data ?? [];
 }
 
+/** Daftar jabatan beserta acuan gaji pokok bulanannya (default_basic_salary).
+ * Dipakai baik di halaman Pegawai (auto-isi form Tambah Pegawai) maupun
+ * halaman Payroll (master "Gaji Pokok per Jabatan"). */
 export async function listPositions() {
   const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.from("employee_positions").select("id, name").order("name");
+  const { data, error } = await supabase
+    .from("employee_positions")
+    .select("id, name, default_basic_salary")
+    .order("name");
   if (error) throw new Error(`Gagal memuat jabatan: ${error.message}`);
   return data ?? [];
 }
 
-export async function createPosition(name: string) {
+export async function createPosition(name: string, defaultBasicSalary: number = 0) {
   const supabase = createSupabaseServerClient();
   const { data: business } = await supabase.from("business").select("id").limit(1).single();
   if (!business) throw new Error("Business tidak ditemukan.");
-  const { error } = await supabase.from("employee_positions").insert({ business_id: business.id, name });
+  if (defaultBasicSalary < 0) throw new Error("Gaji pokok tidak boleh negatif.");
+  const { error } = await supabase
+    .from("employee_positions")
+    .insert({ business_id: business.id, name, default_basic_salary: defaultBasicSalary });
   if (error) throw new Error(`Gagal menambah jabatan: ${error.message}`);
+}
+
+/** Ubah acuan gaji pokok bulanan untuk 1 jabatan. TIDAK mengubah
+ * basic_salary pegawai yang sudah ada (supaya tidak tiba-tiba mengubah
+ * slip gaji semua orang) — cuma jadi acuan baru untuk pegawai baru /
+ * penyesuaian manual berikutnya. */
+export async function updatePositionSalary(id: string, defaultBasicSalary: number) {
+  if (defaultBasicSalary < 0) throw new Error("Gaji pokok tidak boleh negatif.");
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("employee_positions")
+    .update({ default_basic_salary: defaultBasicSalary })
+    .eq("id", id);
+  if (error) throw new Error(`Gagal memperbarui gaji pokok jabatan: ${error.message}`);
 }
 
 export async function createEmployee(input: EmployeeInput) {
@@ -50,6 +80,12 @@ export async function createEmployee(input: EmployeeInput) {
   const { data: business } = await supabase.from("business").select("id").limit(1).single();
   if (!business) throw new Error("Business tidak ditemukan.");
   if (input.basicSalary < 0) throw new Error("Gaji pokok tidak boleh negatif.");
+  const employmentType = input.employmentType ?? "tetap";
+  const dailyRate = input.dailyRate ?? 0;
+  if (dailyRate < 0) throw new Error("Upah harian tidak boleh negatif.");
+  if (employmentType === "casual" && dailyRate === 0) {
+    throw new Error("Upah harian wajib diisi untuk pegawai Casual.");
+  }
 
   const { error } = await supabase.from("employees").insert({
     business_id: business.id,
@@ -58,6 +94,8 @@ export async function createEmployee(input: EmployeeInput) {
     phone: input.phone ?? null,
     position_id: input.positionId ?? null,
     basic_salary: input.basicSalary,
+    employment_type: employmentType,
+    daily_rate: dailyRate,
     join_date: input.joinDate ?? new Date().toISOString().slice(0, 10),
   });
   if (error) throw new Error(`Gagal menambah pegawai: ${error.message}`);
@@ -71,11 +109,16 @@ export async function updateEmployee(
     phone: string;
     positionId: string;
     basicSalary: number;
+    employmentType: "tetap" | "casual";
+    dailyRate: number;
   }>
 ) {
   const supabase = createSupabaseServerClient();
   if (updates.basicSalary !== undefined && updates.basicSalary < 0) {
     throw new Error("Gaji pokok tidak boleh negatif.");
+  }
+  if (updates.dailyRate !== undefined && updates.dailyRate < 0) {
+    throw new Error("Upah harian tidak boleh negatif.");
   }
   if (updates.employeeCode !== undefined && !updates.employeeCode.trim()) {
     throw new Error("Kode pegawai tidak boleh kosong.");
@@ -88,6 +131,8 @@ export async function updateEmployee(
       ...(updates.phone !== undefined && { phone: updates.phone }),
       ...(updates.positionId !== undefined && { position_id: updates.positionId }),
       ...(updates.basicSalary !== undefined && { basic_salary: updates.basicSalary }),
+      ...(updates.employmentType !== undefined && { employment_type: updates.employmentType }),
+      ...(updates.dailyRate !== undefined && { daily_rate: updates.dailyRate }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
