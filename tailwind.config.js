@@ -32,6 +32,11 @@ module.exports = {
         sogan: "#8B3A2A",
         parchment: "#F5EAD6",
         daun: "#3F5B42",
+        // Aksen modern — dipakai tipis-tipis untuk badge/highlight di
+        // dashboard admin supaya terasa lebih segar tanpa mengubah
+        // identitas warna utama coklat kayu.
+        accent: "#2F9E8F",
+        "accent-dark": "#6FD9C8",
       },
       fontFamily: {
         heading: ["Fraunces", "serif"],
