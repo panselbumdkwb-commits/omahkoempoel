@@ -10,8 +10,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { getSalesReportAction } from "./actions";
-import type { SalesReport } from "@/services/reportService";
+import { getSalesReportAction, getFinancialStatementAction } from "./actions";
+import type { SalesReport, FinancialStatement } from "@/services/reportService";
 import { formatJakartaDateTime } from "@/lib/timezone";
 import { extractInclusiveTax } from "@/lib/tax";
 
@@ -42,8 +42,23 @@ function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
-function toCSV(report: SalesReport): string {
+function toCSV(report: SalesReport, financials?: FinancialStatement): string {
   const lines: string[] = [];
+  if (financials) {
+    lines.push("Laporan Laba Rugi");
+    lines.push(`Pendapatan,${financials.revenue}`);
+    lines.push("Biaya Operasional");
+    financials.operationalExpenses.forEach((e) => lines.push(`${e.name},${-e.amount}`));
+    lines.push(`Total Biaya Operasional,${-financials.operationalExpensesTotal}`);
+    lines.push(`Laba Kotor,${financials.grossProfit}`);
+    lines.push(`Total Gaji (Gross),${-financials.payrollCost}`);
+    lines.push(`Laba Operasional,${financials.operatingProfit}`);
+    lines.push("Biaya Non-Operasional");
+    financials.nonOperationalExpenses.forEach((e) => lines.push(`${e.name},${-e.amount}`));
+    lines.push(`Total Biaya Non-Operasional,${-financials.nonOperationalExpensesTotal}`);
+    lines.push(`Laba Bersih,${financials.netProfit}`);
+    lines.push("");
+  }
   lines.push("Ringkasan");
   lines.push(`Revenue,${report.revenue}`);
   lines.push(`Jumlah Order,${report.ordersCount}`);
@@ -72,21 +87,24 @@ function toCSV(report: SalesReport): string {
 
 export default function ReportsClient({
   initialReport,
+  initialFinancials,
   initialStart,
   initialEnd,
 }: {
   initialReport: SalesReport;
+  initialFinancials: FinancialStatement;
   initialStart: string;
   initialEnd: string;
 }) {
   const [report, setReport] = useState<SalesReport>(initialReport);
+  const [financials, setFinancials] = useState<FinancialStatement>(initialFinancials);
   const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
   const [methodFilter, setMethodFilter] = useState<string>("all");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [isPending, startTransition] = useTransition();
   const [printSection, setPrintSection] = useState<
-    "all" | "summary" | "payment" | "transactions" | "products"
+    "all" | "summary" | "payment" | "transactions" | "products" | "labarugi"
   >("all");
 
   const PRINT_SECTION_LABEL: Record<typeof printSection, string> = {
@@ -95,6 +113,7 @@ export default function ReportsClient({
     payment: "Rekap Metode Pembayaran",
     transactions: "Daftar Transaksi Pembayaran",
     products: "Produk Terlaris & Kurang Laku",
+    labarugi: "Laporan Laba Rugi",
   };
 
   const periodLabel =
@@ -112,8 +131,12 @@ export default function ReportsClient({
     setPeriod(p);
     const { start, end } = jakartaRange(p);
     startTransition(async () => {
-      const data = await getSalesReportAction(start.toISOString(), end.toISOString());
-      setReport(data);
+      const [salesData, financialData] = await Promise.all([
+        getSalesReportAction(start.toISOString(), end.toISOString()),
+        getFinancialStatementAction(start.toISOString(), end.toISOString()),
+      ]);
+      setReport(salesData);
+      setFinancials(financialData);
     });
   }
 
@@ -121,16 +144,19 @@ export default function ReportsClient({
     if (!customStart || !customEnd) return;
     setPeriod("custom");
     startTransition(async () => {
-      const data = await getSalesReportAction(
-        new Date(customStart).toISOString(),
-        new Date(new Date(customEnd).getTime() + 24 * 60 * 60 * 1000).toISOString()
-      );
-      setReport(data);
+      const startISO = new Date(customStart).toISOString();
+      const endISO = new Date(new Date(customEnd).getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const [salesData, financialData] = await Promise.all([
+        getSalesReportAction(startISO, endISO),
+        getFinancialStatementAction(startISO, endISO),
+      ]);
+      setReport(salesData);
+      setFinancials(financialData);
     });
   }
 
   function exportCSV() {
-    const blob = new Blob([toCSV(report)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([toCSV(report, financials)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -151,12 +177,15 @@ export default function ReportsClient({
       `}</style>
 
       <div className="flex flex-wrap justify-between items-center gap-3 print:hidden">
-        <h2 className="font-heading text-2xl text-primary">Laporan Penjualan</h2>
-        <div className="flex gap-2 items-center">
+        <div>
+          <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">Laporan Keuangan</p>
+          <h2 className="font-heading text-2xl sm:text-3xl text-primary">Laporan Penjualan &amp; Laba Rugi</h2>
+        </div>
+        <div className="flex gap-2 items-center flex-wrap">
           <select
             value={printSection}
             onChange={(e) => setPrintSection(e.target.value as typeof printSection)}
-            className="border border-border rounded-md px-2 py-2 text-sm bg-background dark:bg-background-dark"
+            className="border border-border rounded-xl px-2 py-2.5 text-sm bg-background dark:bg-background-dark"
             title="Pilih jenis laporan yang akan dicetak"
           >
             {Object.entries(PRINT_SECTION_LABEL).map(([key, label]) => (
@@ -165,52 +194,115 @@ export default function ReportsClient({
               </option>
             ))}
           </select>
-          <button onClick={exportCSV} className="px-3 py-2 rounded-md border border-border text-sm">
+          <button onClick={exportCSV} className="btn-ghost-modern">
             Export CSV
           </button>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-2 rounded-md bg-primary text-white text-sm font-semibold"
-          >
+          <button onClick={() => window.print()} className="btn-primary-modern">
             🖨️ Cetak Laporan
           </button>
         </div>
       </div>
 
       {/* PERIOD SELECTOR */}
-      <div className="flex flex-wrap gap-2 print:hidden">
+      <div className="flex flex-wrap gap-2 items-center print:hidden">
         {(["today", "week", "month"] as const).map((p) => (
           <button
             key={p}
             onClick={() => loadPeriod(p)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold border ${
-              period === p ? "bg-primary text-white border-primary" : "border-border"
+            className={`pill-nav-link border ${
+              period === p ? "pill-nav-link-active border-primary" : "border-border pill-nav-link-inactive"
             }`}
           >
             {p === "today" ? "Hari Ini" : p === "week" ? "Minggu Ini" : "Bulan Ini"}
           </button>
         ))}
-        <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-border rounded-md px-2 text-sm" />
-        <span className="self-center text-sm">s/d</span>
-        <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-border rounded-md px-2 text-sm" />
-        <button onClick={loadCustom} className="px-4 py-2 rounded-full text-sm font-semibold border border-border">
+        <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="border border-border rounded-xl px-3 py-2 text-sm bg-surface dark:bg-surface-dark" />
+        <span className="self-center text-sm text-text-muted">s/d</span>
+        <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="border border-border rounded-xl px-3 py-2 text-sm bg-surface dark:bg-surface-dark" />
+        <button onClick={loadCustom} className="pill-nav-link border border-border pill-nav-link-inactive">
           Terapkan
         </button>
       </div>
 
-      {isPending && <p className="text-sm text-text-muted">Memuat...</p>}
+      {isPending && <p className="text-sm text-text-muted animate-pulse">Memuat data terbaru...</p>}
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 print:hidden">
-        <StatCard label="Revenue" value={formatRupiah(report.revenue)} />
-        <StatCard label="Jumlah Order" value={String(report.ordersCount)} />
-        <StatCard label="Order Terbayar" value={String(report.paidOrdersCount)} />
-        <StatCard label="Rata-rata Order" value={formatRupiah(report.averageOrderValue)} />
+        <StatCard label="Revenue" value={formatRupiah(report.revenue)} accent="primary" />
+        <StatCard label="Jumlah Order" value={String(report.ordersCount)} accent="secondary" />
+        <StatCard label="Order Terbayar" value={String(report.paidOrdersCount)} accent="success" />
+        <StatCard label="Rata-rata Order" value={formatRupiah(report.averageOrderValue)} accent="accent" />
       </div>
 
+      {/* LAPORAN LABA RUGI (P&L) */}
+      <section className="card-modern p-5 print:hidden">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="section-title-modern">📊 Laporan Laba Rugi</h3>
+          <span className="badge-modern bg-background dark:bg-background-dark text-text-muted">{periodLabel}</span>
+        </div>
+        <p className="text-xs text-text-muted mb-4">
+          Pendapatan dikurangi biaya operasional (di luar gaji), biaya gaji pegawai, lalu biaya
+          non-operasional — belum termasuk HPP bahan baku (menyusul di modul Inventory).
+        </p>
+
+        <div className="grid sm:grid-cols-3 gap-3 mb-5">
+          <PnlCard label="Laba Kotor" sub="Pendapatan − Biaya Operasional" value={financials.grossProfit} tone="neutral" />
+          <PnlCard label="Laba Operasional" sub="Laba Kotor − Biaya Gaji" value={financials.operatingProfit} tone="neutral" />
+          <PnlCard label="Laba Bersih" sub="Laba Operasional − Non-Operasional" value={financials.netProfit} tone="final" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <tbody>
+              <PnlRow label="Pendapatan (Penjualan)" value={financials.revenue} bold />
+              <PnlSectionHeader label="Biaya Operasional" />
+              {financials.operationalExpenses.length === 0 ? (
+                <PnlEmptyRow />
+              ) : (
+                financials.operationalExpenses.map((e) => (
+                  <PnlRow key={e.name} label={e.name} value={-e.amount} indent note={!e.recorded ? "belum dicatat" : undefined} />
+                ))
+              )}
+              <PnlRow label="Total Biaya Operasional" value={-financials.operationalExpensesTotal} indent bold />
+              <PnlRow label="Laba Kotor" value={financials.grossProfit} bold accentTotal />
+
+              <PnlSectionHeader label={`Biaya Gaji Pegawai${financials.payrollPeriodsIncluded > 0 ? ` (${financials.payrollPeriodsIncluded} periode payroll)` : ""}`} />
+              <PnlRow
+                label="Total Gaji (Gross)"
+                value={-financials.payrollCost}
+                indent
+                note={financials.payrollPeriodsIncluded === 0 ? "belum ada periode payroll dijalankan dalam rentang ini" : undefined}
+              />
+              <PnlRow label="Laba Operasional" value={financials.operatingProfit} bold accentTotal />
+
+              <PnlSectionHeader label="Biaya Non-Operasional" />
+              {financials.nonOperationalExpenses.length === 0 ? (
+                <PnlEmptyRow note="belum ada biaya diklasifikasikan non-operasional" />
+              ) : (
+                financials.nonOperationalExpenses.map((e) => (
+                  <PnlRow key={e.name} label={e.name} value={-e.amount} indent note={!e.recorded ? "belum dicatat" : undefined} />
+                ))
+              )}
+              <PnlRow label="Total Biaya Non-Operasional" value={-financials.nonOperationalExpensesTotal} indent bold />
+
+              <tr className="border-t-2 border-primary">
+                <td className="py-3 font-heading text-base text-primary">Laba Bersih</td>
+                <td className={`py-3 text-right font-heading text-base ${financials.netProfit >= 0 ? "text-success" : "text-danger"}`}>
+                  {formatRupiah(financials.netProfit)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-text-muted mt-3">
+          Kelola & klasifikasikan (Operasional/Non-Operasional) biaya di halaman{" "}
+          <a href="/admin/payroll" className="text-primary underline">Payroll → Biaya Operasional</a>.
+        </p>
+      </section>
+
       {/* TREND CHART */}
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h3 className="font-heading text-lg text-primary mb-4">Tren Revenue Harian</h3>
+      <section className="card-modern p-5 print:hidden">
+        <h3 className="section-title-modern mb-4">📈 Tren Revenue Harian</h3>
         {report.dailyTrend.length === 0 ? (
           <p className="text-sm text-text-muted">Belum ada data pada periode ini.</p>
         ) : (
@@ -227,8 +319,8 @@ export default function ReportsClient({
       </section>
 
       {/* PAYMENT BREAKDOWN */}
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h3 className="font-heading text-lg text-primary mb-4">Rekap per Metode Pembayaran</h3>
+      <section className="card-modern p-5 print:hidden">
+        <h3 className="section-title-modern mb-4">💳 Rekap per Metode Pembayaran</h3>
         {report.paymentBreakdown.length === 0 ? (
           <p className="text-sm text-text-muted">Belum ada pembayaran pada periode ini.</p>
         ) : (
@@ -439,19 +531,73 @@ export default function ReportsClient({
             <PrintProductTable products={report.bottomProducts} />
           </section>
         )}
+
+        {(printSection === "all" || printSection === "labarugi") && (
+          <section className="mb-6 break-inside-avoid">
+            <h2 className="font-bold text-sm mb-2 uppercase">Laporan Laba Rugi</h2>
+            <table className="w-full text-sm border-collapse">
+              <tbody>
+                <tr className="border-b border-black font-semibold">
+                  <td className="py-1">Pendapatan (Penjualan)</td>
+                  <td className="py-1 text-right">{formatRupiah(financials.revenue)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="pt-2 pb-1 text-xs font-bold uppercase">Biaya Operasional</td>
+                </tr>
+                {financials.operationalExpenses.map((e) => (
+                  <tr key={e.name} className="border-b border-black">
+                    <td className="py-1 pl-3">{e.name}</td>
+                    <td className="py-1 text-right">{formatRupiah(-e.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="border-b border-black font-semibold">
+                  <td className="py-1 pl-3">Total Biaya Operasional</td>
+                  <td className="py-1 text-right">{formatRupiah(-financials.operationalExpensesTotal)}</td>
+                </tr>
+                <tr className="border-b-2 border-black font-bold">
+                  <td className="py-1">Laba Kotor</td>
+                  <td className="py-1 text-right">{formatRupiah(financials.grossProfit)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="pt-2 pb-1 text-xs font-bold uppercase">Biaya Gaji Pegawai</td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1 pl-3">Total Gaji (Gross)</td>
+                  <td className="py-1 text-right">{formatRupiah(-financials.payrollCost)}</td>
+                </tr>
+                <tr className="border-b-2 border-black font-bold">
+                  <td className="py-1">Laba Operasional</td>
+                  <td className="py-1 text-right">{formatRupiah(financials.operatingProfit)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={2} className="pt-2 pb-1 text-xs font-bold uppercase">Biaya Non-Operasional</td>
+                </tr>
+                {financials.nonOperationalExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="py-1 pl-3 italic text-xs">Tidak ada</td>
+                  </tr>
+                ) : (
+                  financials.nonOperationalExpenses.map((e) => (
+                    <tr key={e.name} className="border-b border-black">
+                      <td className="py-1 pl-3">{e.name}</td>
+                      <td className="py-1 text-right">{formatRupiah(-e.amount)}</td>
+                    </tr>
+                  ))
+                )}
+                <tr className="border-t-2 border-black font-bold text-base">
+                  <td className="py-2">LABA BERSIH</td>
+                  <td className="py-2 text-right">{formatRupiah(financials.netProfit)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface dark:bg-surface-dark p-4">
-      <p className="text-text-muted text-xs mb-1">{label}</p>
-      <p className="font-heading text-xl text-primary">{value}</p>
-    </div>
-  );
-}
+
 
 function ProductTable({
   title,
@@ -461,8 +607,8 @@ function ProductTable({
   products: { name: string; quantity: number; revenue: number }[];
 }) {
   return (
-    <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
-      <h3 className="font-heading text-lg text-primary mb-3">{title}</h3>
+    <section className="card-modern p-5">
+      <h3 className="section-title-modern mb-3">{title}</h3>
       {products.length === 0 ? (
         <p className="text-sm text-text-muted">Belum ada data.</p>
       ) : (
@@ -514,5 +660,80 @@ function PrintProductTable({
         ))}
       </tbody>
     </table>
+  );
+}
+
+const STAT_ACCENT_CLASS: Record<string, string> = {
+  primary: "text-primary",
+  secondary: "text-secondary dark:text-secondary-dark",
+  success: "text-success",
+  accent: "text-accent",
+};
+
+function StatCard({ label, value, accent = "primary" }: { label: string; value: string; accent?: string }) {
+  return (
+    <div className="stat-card-modern">
+      <p className="text-text-muted text-xs font-medium">{label}</p>
+      <p className={`font-heading text-xl ${STAT_ACCENT_CLASS[accent] ?? "text-primary"}`}>{value}</p>
+    </div>
+  );
+}
+
+function PnlCard({ label, sub, value, tone }: { label: string; sub: string; value: number; tone: "neutral" | "final" }) {
+  const positive = value >= 0;
+  return (
+    <div className={`rounded-xl p-4 border ${tone === "final" ? "border-primary bg-primary/5" : "border-border bg-background dark:bg-background-dark"}`}>
+      <p className="text-xs font-semibold text-text-muted mb-0.5">{label}</p>
+      <p className={`font-heading text-lg ${positive ? "text-success" : "text-danger"}`}>{formatRupiah(value)}</p>
+      <p className="text-[11px] text-text-muted mt-0.5">{sub}</p>
+    </div>
+  );
+}
+
+function PnlSectionHeader({ label }: { label: string }) {
+  return (
+    <tr>
+      <td colSpan={2} className="pt-4 pb-1 text-xs font-bold uppercase tracking-wide text-text-muted">
+        {label}
+      </td>
+    </tr>
+  );
+}
+
+function PnlEmptyRow({ note }: { note?: string }) {
+  return (
+    <tr>
+      <td colSpan={2} className="py-1.5 text-xs text-text-muted italic pl-4">
+        {note ?? "belum ada data biaya"}
+      </td>
+    </tr>
+  );
+}
+
+function PnlRow({
+  label,
+  value,
+  bold,
+  indent,
+  note,
+  accentTotal,
+}: {
+  label: string;
+  value: number;
+  bold?: boolean;
+  indent?: boolean;
+  note?: string;
+  accentTotal?: boolean;
+}) {
+  return (
+    <tr className={accentTotal ? "border-t border-border" : "border-b border-border/60"}>
+      <td className={`py-1.5 ${indent ? "pl-4" : ""} ${bold ? "font-semibold" : ""}`}>
+        {label}
+        {note && <span className="ml-2 text-[11px] text-warning font-normal">({note})</span>}
+      </td>
+      <td className={`py-1.5 text-right ${bold ? "font-semibold" : ""} ${accentTotal ? (value >= 0 ? "text-success" : "text-danger") : ""}`}>
+        {formatRupiah(value)}
+      </td>
+    </tr>
   );
 }

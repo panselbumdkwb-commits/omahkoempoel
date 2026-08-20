@@ -63,10 +63,22 @@ export async function createExpenseAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const category = String(formData.get("category") ?? "other") as operationalExpenseService.ExpenseCategory;
   const calcType = String(formData.get("calcType") ?? "fixed") as operationalExpenseService.ExpenseCalcType;
+  const expenseType = String(formData.get("expenseType") ?? "operational") as operationalExpenseService.ExpenseType;
   const value = Number(formData.get("value") ?? 0);
   if (!name) throw new Error("Nama biaya wajib diisi.");
-  await operationalExpenseService.createExpense({ name, category, calcType, value });
+  await operationalExpenseService.createExpense({ name, category, calcType, value, expenseType });
   revalidatePath("/admin/payroll");
+  revalidatePath("/admin/reports");
+}
+
+/** Ubah klasifikasi Operasional/Non-Operasional 1 biaya — dipakai
+ * Laporan Laba Rugi di halaman Laporan supaya pemisahan biayanya
+ * sesuai keputusan Owner (mis. bunga bank/penyusutan = non-operasional). */
+export async function updateExpenseTypeAction(id: string, expenseType: operationalExpenseService.ExpenseType) {
+  if (!id) throw new Error("Biaya tidak valid.");
+  await operationalExpenseService.updateExpenseType(id, expenseType);
+  revalidatePath("/admin/payroll");
+  revalidatePath("/admin/reports");
 }
 
 export async function updateExpenseValueAction(formData: FormData) {

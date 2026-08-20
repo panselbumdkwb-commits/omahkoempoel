@@ -20,19 +20,34 @@ export async function getCurrentUser() {
   return user;
 }
 
-/** Defense in depth untuk halaman admin yang BUKAN Jadwal Shift/Absensi
- * (mis. Payroll, Kelola Menu, Pegawai, Laporan, QR Meja, Pengaturan).
- * /admin/layout.tsx sudah izinkan role CAPTAIN masuk ke /admin secara
- * umum (supaya bisa lihat Jadwal Shift & Absensi — lihat migration 0014),
- * jadi tiap halaman admin LAIN yang memang harus SUPER_ADMIN/OWNER saja
- * wajib panggil ini di awal supaya Captain tidak bisa buka lewat URL
- * langsung. Dikembalikan role-nya supaya halaman pemanggil tidak perlu
- * panggil getCurrentRole() dua kali kalau masih butuh nilainya.
+/** Gerbang untuk halaman admin (Dashboard, Laporan, Kelola Menu,
+ * Pegawai, Absensi, Payroll, QR Meja, Jadwal Shift, Pengaturan).
+ * CAPTAIN diberi akses 'view' penuh yang setara SUPER_ADMIN/OWNER di
+ * semua halaman ini (lihat migration 0016) — tapi TIDAK bisa
+ * menulis/mengubah data apa pun di luar wewenang KASIR-nya, karena
+ * setiap server action menulis lewat RLS yang masih membatasi
+ * *_manage/*_rw hanya untuk SUPER_ADMIN/OWNER. Jadi guard ini cukup
+ * dipakai di page.tsx (baca data), bukan di actions.ts (tulis data) —
+ * pertahanan tulis-data ada di database, bukan di sini.
+ * Dikembalikan role-nya supaya halaman pemanggil tidak perlu panggil
+ * getCurrentRole() dua kali kalau masih butuh nilainya.
  */
 export async function requireAdminOrOwner(): Promise<string> {
   const role = await getCurrentRole();
+  if (!role || !["SUPER_ADMIN", "OWNER", "CAPTAIN"].includes(role)) {
+    redirect("/pos");
+  }
+  return role;
+}
+
+/** Khusus halaman yang WAJIB SUPER_ADMIN/OWNER saja, tidak boleh
+ * dilihat CAPTAIN sama sekali (mis. Kelola User — Bagian 27 master
+ * prompt: Owner tidak boleh mengubah user permission, apalagi Captain).
+ */
+export async function requireSuperAdminOrOwner(): Promise<string> {
+  const role = await getCurrentRole();
   if (!role || !["SUPER_ADMIN", "OWNER"].includes(role)) {
-    redirect("/admin/schedule");
+    redirect("/admin");
   }
   return role;
 }

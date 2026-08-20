@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { computeMonthlyExpenseTotal } from "@/services/operationalExpenseService";
 
 export type SalesReport = {
   revenue: number;
@@ -107,4 +108,89 @@ export async function getSalesReport(startISO: string, endISO: string): Promise<
   }
 
   return { revenue, ordersCount, paidOrdersCount, averageOrderValue, paymentBreakdown, dailyTrend, topProducts, bottomProducts, paymentTransactions };
+}
+
+export type FinancialStatement = {
+  revenue: number;
+  operationalExpenses: { name: string; category: string; amount: number; recorded: boolean }[];
+  operationalExpensesTotal: number;
+  nonOperationalExpenses: { name: string; category: string; amount: number; recorded: boolean }[];
+  nonOperationalExpensesTotal: number;
+  payrollCost: number;
+  payrollPeriodsIncluded: number;
+  grossProfit: number; // revenue - biaya operasional inti (di luar gaji)
+  operatingProfit: number; // grossProfit - gaji pegawai (masih termasuk operasional)
+  netProfit: number; // operatingProfit - biaya non-operasional
+};
+
+/**
+ * Laporan Laba Rugi (P&L) sederhana untuk 1 periode: Pendapatan −
+ * Biaya Operasional (listrik/air/internet/kebersihan/dst, sesuai
+ * klasifikasi Owner di halaman Payroll) − Biaya Gaji Pegawai (dari
+ * payroll_periods yang jatuh SEPENUHNYA di dalam rentang periode) −
+ * Biaya Non-Operasional = Laba Bersih.
+ *
+ * Catatan keterbatasan (lihat juga PHASE_FINANCE_HR.md bagian F):
+ * belum ada modul Harga Pokok Penjualan (HPP/COGS) bahan baku —
+ * begitu modul Inventory berjalan, "Laba Kotor" di bawah bisa
+ * dikurangi HPP supaya lebih akurat secara akuntansi. Untuk sekarang,
+ * "Laba Kotor" = Pendapatan − Biaya Operasional Non-Gaji, dan
+ * perhitungan biaya operasional (fixed/percent/variable_manual)
+ * memakai bulan kalender dari tanggal mulai periode — cukup akurat
+ * untuk periode 1 bulan; untuk periode custom yang melintasi >1 bulan
+ * kalender, angka biaya "fixed"/"variable_manual" mengikuti bulan
+ * tanggal mulai (konsisten dengan payrollService & PayrollClient).
+ */
+export async function getFinancialStatement(startISO: string, endISO: string): Promise<FinancialStatement> {
+  const startDate = startISO.slice(0, 10);
+  const endDateExclusive = new Date(endISO);
+  endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() - 1);
+  const endDate = endDateExclusive.toISOString().slice(0, 10);
+
+  const [salesReport, expenseTotal] = await Promise.all([
+    getSalesReport(startISO, endISO),
+    computeMonthlyExpenseTotal(startDate, endDate > startDate ? endDate : startDate),
+  ]);
+
+  const operationalExpenses = expenseTotal.breakdown
+    .filter((b) => b.expense_type === "operational")
+    .map((b) => ({ name: b.name, category: b.category, amount: b.amount, recorded: b.recorded }));
+  const nonOperationalExpenses = expenseTotal.breakdown
+    .filter((b) => b.expense_type === "non_operational")
+    .map((b) => ({ name: b.name, category: b.category, amount: b.amount, recorded: b.recorded }));
+
+  const supabase = createSupabaseServerClient();
+  const { data: periods } = await supabase
+    .from("payroll_periods")
+    .select("id, period_start, period_end")
+    .gte("period_start", startDate)
+    .lte("period_end", endDate <= startDate ? startDate : endDate);
+
+  let payrollCost = 0;
+  let payrollPeriodsIncluded = 0;
+  if (periods && periods.length > 0) {
+    const periodIds = periods.map((p) => p.id);
+    const { data: items } = await supabase.from("payroll_items").select("gross_salary").in("payroll_period_id", periodIds);
+    payrollCost = (items ?? []).reduce((sum, it) => sum + Number(it.gross_salary), 0);
+    payrollPeriodsIncluded = periods.length;
+  }
+
+  const operationalExpensesTotal = expenseTotal.operationalTotal;
+  const nonOperationalExpensesTotal = expenseTotal.nonOperationalTotal;
+  const grossProfit = salesReport.revenue - operationalExpensesTotal;
+  const operatingProfit = grossProfit - payrollCost;
+  const netProfit = operatingProfit - nonOperationalExpensesTotal;
+
+  return {
+    revenue: salesReport.revenue,
+    operationalExpenses,
+    operationalExpensesTotal,
+    nonOperationalExpenses,
+    nonOperationalExpensesTotal,
+    payrollCost,
+    payrollPeriodsIncluded,
+    grossProfit,
+    operatingProfit,
+    netProfit,
+  };
 }

@@ -3,12 +3,18 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export type ExpenseCategory = "utility" | "social" | "other";
 export type ExpenseCalcType = "fixed" | "percent_of_revenue" | "variable_manual";
+/** Klasifikasi untuk Laporan Laba Rugi (migration 0016). 'operational':
+ * biaya operasional inti cafe (listrik, air, internet, kebersihan, dll).
+ * 'non_operational': di luar operasional utama (mis. bunga bank, biaya
+ * administrasi bank, penyusutan aset, kerugian/sumbangan non-rutin). */
+export type ExpenseType = "operational" | "non_operational";
 
 export type OperationalExpense = {
   id: string;
   name: string;
   category: ExpenseCategory;
   calc_type: ExpenseCalcType;
+  expense_type: ExpenseType;
   value: number;
   is_active: boolean;
 };
@@ -17,7 +23,7 @@ export async function listExpenses() {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("operational_expenses")
-    .select("id, name, category, calc_type, value, is_active")
+    .select("id, name, category, calc_type, expense_type, value, is_active")
     .order("sort_order");
   if (error) throw new Error(`Gagal memuat biaya operasional: ${error.message}`);
   return (data ?? []) as OperationalExpense[];
@@ -71,6 +77,7 @@ export async function createExpense(input: {
   category: ExpenseCategory;
   calcType: ExpenseCalcType;
   value: number;
+  expenseType?: ExpenseType;
 }) {
   if (!input.name.trim()) throw new Error("Nama biaya wajib diisi.");
   if (input.value < 0) throw new Error("Nilai tidak boleh negatif.");
@@ -83,9 +90,23 @@ export async function createExpense(input: {
     name: input.name.trim(),
     category: input.category,
     calc_type: input.calcType,
+    expense_type: input.expenseType ?? "operational",
     value: input.value,
   });
   if (error) throw new Error(`Gagal menambah biaya operasional: ${error.message}`);
+}
+
+/** Ubah klasifikasi Operasional/Non-Operasional 1 biaya — dipakai
+ * halaman Payroll (bagian Biaya Operasional) supaya Owner bisa
+ * mengelompokkan biaya sesuai standar Laporan Laba Rugi tanpa perlu
+ * menghapus & membuat ulang datanya. */
+export async function updateExpenseType(id: string, expenseType: ExpenseType) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("operational_expenses")
+    .update({ expense_type: expenseType, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(`Gagal mengubah klasifikasi biaya: ${error.message}`);
 }
 
 export async function updateExpenseValue(id: string, value: number) {
@@ -131,11 +152,11 @@ export async function computeMonthlyExpenseTotal(periodStart: string, periodEnd:
 
   const breakdown = expenses.map((e) => {
     if (e.calc_type === "fixed") {
-      return { name: e.name, category: e.category, calc_type: e.calc_type, value: e.value, amount: Number(e.value), recorded: true };
+      return { name: e.name, category: e.category, calc_type: e.calc_type, expense_type: e.expense_type, value: e.value, amount: Number(e.value), recorded: true };
     }
     if (e.calc_type === "percent_of_revenue") {
       const amount = Math.round((revenue * Number(e.value)) / 100);
-      return { name: e.name, category: e.category, calc_type: e.calc_type, value: e.value, amount, recorded: true };
+      return { name: e.name, category: e.category, calc_type: e.calc_type, expense_type: e.expense_type, value: e.value, amount, recorded: true };
     }
     // variable_manual
     const recorded = Object.prototype.hasOwnProperty.call(entriesMap, e.id);
@@ -143,6 +164,7 @@ export async function computeMonthlyExpenseTotal(periodStart: string, periodEnd:
       name: e.name,
       category: e.category,
       calc_type: e.calc_type,
+      expense_type: e.expense_type,
       value: e.value,
       amount: entriesMap[e.id] ?? 0,
       recorded,
@@ -150,5 +172,7 @@ export async function computeMonthlyExpenseTotal(periodStart: string, periodEnd:
   });
 
   const total = breakdown.reduce((sum, b) => sum + b.amount, 0);
-  return { breakdown, total, revenue, periodMonth };
+  const operationalTotal = breakdown.filter((b) => b.expense_type === "operational").reduce((s, b) => s + b.amount, 0);
+  const nonOperationalTotal = breakdown.filter((b) => b.expense_type === "non_operational").reduce((s, b) => s + b.amount, 0);
+  return { breakdown, total, operationalTotal, nonOperationalTotal, revenue, periodMonth };
 }

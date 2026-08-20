@@ -113,3 +113,12 @@ export async function recordAttendanceAction(formData: FormData) {
   });
   revalidatePath("/admin/attendance");
 }
+
+/** Ambil daftar absensi untuk 1 tanggal — dipakai halaman Absensi
+ * Pegawai supaya Admin/Owner/Captain bisa pindah tanggal (hari
+ * sebelumnya/berikutnya, atau pilih tanggal langsung) tanpa reload
+ * halaman penuh. */
+export async function getAttendanceByDateAction(date: string) {
+  if (!date) throw new Error("Tanggal wajib diisi.");
+  return employeeService.listAttendanceByDate(date);
+}

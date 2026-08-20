@@ -12,6 +12,7 @@ import {
   createExpenseAction,
   updateExpenseValueAction,
   toggleExpenseAction,
+  updateExpenseTypeAction,
   computeMonthlyExpenseTotalAction,
   recordExpenseEntryAction,
   listExpenseEntriesForMonthAction,
@@ -39,11 +40,13 @@ type Period = { id: string; period_start: string; period_end: string; status: st
 type Position = { id: string; name: string; default_basic_salary: number };
 type ExpenseCategory = "utility" | "social" | "other";
 type ExpenseCalcType = "fixed" | "percent_of_revenue" | "variable_manual";
+type ExpenseType = "operational" | "non_operational";
 type Expense = {
   id: string;
   name: string;
   category: ExpenseCategory;
   calc_type: ExpenseCalcType;
+  expense_type: ExpenseType;
   value: number;
   is_active: boolean;
 };
@@ -51,6 +54,7 @@ type ExpenseBreakdownRow = {
   name: string;
   category: ExpenseCategory;
   calc_type: ExpenseCalcType;
+  expense_type: ExpenseType;
   value: number;
   amount: number;
   recorded: boolean;
@@ -95,6 +99,11 @@ const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   utility: "Utilitas",
   social: "Sosial",
   other: "Lainnya",
+};
+
+const EXPENSE_TYPE_LABEL: Record<ExpenseType, string> = {
+  operational: "Operasional",
+  non_operational: "Non-Operasional",
 };
 
 export default function PayrollClient({
@@ -190,8 +199,8 @@ export default function PayrollClient({
         </div>
       )}
 
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h2 className="font-heading text-xl text-primary mb-2">Komponen Payroll (Configurable)</h2>
+      <section className="card-modern p-5 print:hidden">
+        <h2 className="section-title-modern text-xl mb-2">Komponen Payroll (Configurable)</h2>
         <p className="text-xs text-text-muted mb-4">
           Semua formula gaji dihitung dari komponen ini — bukan hardcode. Nonaktifkan komponen yang
           tidak berlaku, atau tambah baru sesuai kebijakan cafe. Nilai BPJS default mengikuti
@@ -243,8 +252,8 @@ export default function PayrollClient({
         </form>
       </section>
 
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h2 className="font-heading text-xl text-primary mb-2">Gaji Pokok per Jabatan</h2>
+      <section className="card-modern p-5 print:hidden">
+        <h2 className="section-title-modern text-xl mb-2">Gaji Pokok per Jabatan</h2>
         <p className="text-xs text-text-muted mb-4">
           Acuan gaji pokok bulanan tiap jabatan.{" "}
           <span className="font-semibold">
@@ -312,8 +321,8 @@ export default function PayrollClient({
         </div>
       </section>
 
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h2 className="font-heading text-xl text-primary mb-2">Biaya Operasional Bulanan</h2>
+      <section className="card-modern p-5 print:hidden">
+        <h2 className="section-title-modern text-xl mb-2">Biaya Operasional Bulanan</h2>
         <p className="text-xs text-text-muted mb-4">
           Biaya rutin di luar gaji pegawai. <span className="font-semibold">Listrik</span> &{" "}
           <span className="font-semibold">Air</span> nominalnya berubah tiap bulan sesuai pemakaian,
@@ -324,13 +333,28 @@ export default function PayrollClient({
           {expenses
             .filter((e) => e.calc_type !== "variable_manual")
             .map((e) => (
-              <div key={e.id} className="py-2 flex justify-between items-center text-sm gap-2">
+              <div key={e.id} className="py-2 flex justify-between items-center text-sm gap-2 flex-wrap">
                 <div>
                   <span>{e.name}</span>
                   <span className="ml-2 text-xs text-text-muted">({EXPENSE_CATEGORY_LABEL[e.category]})</span>
                   {!e.is_active && <span className="ml-2 text-xs text-text-muted">(nonaktif)</span>}
                 </div>
                 <div className="flex gap-2 items-center">
+                  <select
+                    value={e.expense_type}
+                    onChange={(ev) =>
+                      startTransition(() => updateExpenseTypeAction(e.id, ev.target.value as ExpenseType))
+                    }
+                    title="Klasifikasi untuk Laporan Laba Rugi"
+                    className={`text-xs px-2 py-1.5 rounded-full border font-semibold ${
+                      e.expense_type === "operational"
+                        ? "bg-secondary/10 text-secondary dark:text-secondary-dark border-secondary/30"
+                        : "bg-warning/10 text-warning border-warning/30"
+                    }`}
+                  >
+                    <option value="operational">{EXPENSE_TYPE_LABEL.operational}</option>
+                    <option value="non_operational">{EXPENSE_TYPE_LABEL.non_operational}</option>
+                  </select>
                   <form
                     action={(fd) =>
                       startTransition(async () => {
@@ -413,6 +437,15 @@ export default function PayrollClient({
             <option value="variable_manual">Variabel — dicatat manual tiap bulan (mis. Listrik, Air)</option>
             <option value="percent_of_revenue">Persen dari Omset Bulan</option>
           </select>
+          <select
+            name="expenseType"
+            defaultValue="operational"
+            title="Klasifikasi untuk Laporan Laba Rugi"
+            className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+          >
+            <option value="operational">Klasifikasi: Biaya Operasional (listrik, air, internet, dll)</option>
+            <option value="non_operational">Klasifikasi: Biaya Non-Operasional (bunga bank, penyusutan, dll)</option>
+          </select>
           <input
             name="value"
             type="number"
@@ -482,8 +515,8 @@ export default function PayrollClient({
         </div>
       </section>
 
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h2 className="font-heading text-xl text-primary mb-4">Jalankan Payroll</h2>
+      <section className="card-modern p-5 print:hidden">
+        <h2 className="section-title-modern text-xl mb-4">Jalankan Payroll</h2>
         <form action={runPayroll} className="flex flex-wrap gap-2 items-end">
           <div>
             <label className="text-xs block mb-1">Periode Mulai</label>
@@ -499,8 +532,8 @@ export default function PayrollClient({
         </form>
       </section>
 
-      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
-        <h2 className="font-heading text-xl text-primary mb-4">Riwayat Periode Payroll</h2>
+      <section className="card-modern p-5 print:hidden">
+        <h2 className="section-title-modern text-xl mb-4">Riwayat Periode Payroll</h2>
         <div className="divide-y divide-border">
           {periods.map((p) => (
             <button key={p.id} onClick={() => openPeriod(p.id)} className="w-full text-left py-2 flex justify-between text-sm hover:text-primary">
@@ -514,7 +547,7 @@ export default function PayrollClient({
       </section>
 
       {selectedPeriod && items && (
-        <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:border-0 print:bg-white print:p-0">
+        <section className="card-modern p-5 print:border-0 print:bg-white print:p-0 print:shadow-none">
           {/* CSS khusus printer thermal (lebar 80mm) — sama seperti nota/
               tiket dapur di /print, hanya berlaku saat benar-benar mencetak. */}
           <style>{`
