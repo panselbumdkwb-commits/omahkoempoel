@@ -38,6 +38,28 @@ type ScheduleRow = {
   is_off: boolean;
   note: string | null;
 };
+type AttendanceHighlight = {
+  id: string;
+  employee_id: string;
+  attendance_date: string;
+  status: string;
+  late_minutes: number | null;
+  notes: string | null;
+  employees: { full_name: string; employee_code: string } | { full_name: string; employee_code: string }[] | null;
+};
+
+const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
+  late: "Terlambat",
+  absent: "Tidak Hadir",
+  leave: "Ijin",
+  sick: "Sakit",
+  early_leave: "Pulang Cepat",
+};
+
+function attendanceEmployeeName(a: AttendanceHighlight) {
+  const emp = Array.isArray(a.employees) ? a.employees[0] : a.employees;
+  return emp?.full_name ?? "-";
+}
 
 type DayState = { shiftPreset: ShiftId | ""; shiftStart: string; shiftEnd: string; isOff: boolean };
 
@@ -68,9 +90,15 @@ function buildInitialState(employees: Employee[], schedule: ScheduleRow[]) {
 export default function ScheduleClient({
   employees,
   initialSchedule,
+  readOnly = false,
+  attendanceHighlights = [],
+  weekRange,
 }: {
   employees: Employee[];
   initialSchedule: ScheduleRow[];
+  readOnly?: boolean;
+  attendanceHighlights?: AttendanceHighlight[];
+  weekRange?: { start: string; end: string };
 }) {
   const [state, setState] = useState(() => buildInitialState(employees, initialSchedule));
   const [isPending, startTransition] = useTransition();
@@ -175,8 +203,9 @@ export default function ScheduleClient({
       <div>
         <h2 className="font-heading text-2xl text-primary">Jadwal Kerja Pegawai</h2>
         <p className="text-sm text-text-muted mt-1">
-          Pilih shift per hari untuk tiap pegawai. Tersedia 4 shift baku, atau pilih "Kustom" untuk
-          atur jam manual.
+          {readOnly
+            ? "Jadwal shift tiap pegawai (tampilan lihat-saja — susun/ubah jadwal lewat akun Admin/Owner)."
+            : 'Pilih shift per hari untuk tiap pegawai. Tersedia 4 shift baku, atau pilih "Kustom" untuk atur jam manual.'}
         </p>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {SHIFT_PRESETS.filter((p) => p.id !== "custom").map((p) => (
@@ -187,51 +216,83 @@ export default function ScheduleClient({
         </div>
       </div>
 
-      <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-primary">Generate Jadwal Otomatis</p>
-            <p className="text-xs text-text-muted mt-1 max-w-xl">
-              Susun jadwal shift untuk semua jabatan (Kasir, Bar, Kitchen, Waitres) sekaligus dari
-              data pegawai aktif saat ini: 6 hari kerja/1 libur bergantian (libur tidak pernah di
-              akhir pekan), Kasir di-backup Kapten saat libur, Kapten tanpa jam tetap, Sekuriti
-              selalu Shift Malam.
-            </p>
+      {attendanceHighlights.length > 0 && (
+        <div className="rounded-md border border-border bg-surface dark:bg-surface-dark p-4">
+          <p className="font-semibold text-primary mb-1">
+            Ijin &amp; Keterlambatan Minggu Ini{weekRange ? ` (${weekRange.start} s/d ${weekRange.end})` : ""}
+          </p>
+          <p className="text-xs text-text-muted mb-3">
+            Rekap dari catatan Absensi — status selain "Hadir" pada rentang minggu berjalan.
+          </p>
+          <div className="divide-y divide-border">
+            {attendanceHighlights.map((a) => (
+              <div key={a.id} className="py-2 flex justify-between items-center text-sm gap-2">
+                <div>
+                  <span className="font-semibold">{attendanceEmployeeName(a)}</span>{" "}
+                  <span className="text-text-muted text-xs">{a.attendance_date}</span>
+                  {a.notes && <p className="text-xs text-text-muted">{a.notes}</p>}
+                </div>
+                <span
+                  className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                    a.status === "late" ? "bg-batik-gold/20 text-wood-dark" : "bg-danger/15 text-danger"
+                  }`}
+                >
+                  {ATTENDANCE_STATUS_LABEL[a.status] ?? a.status}
+                  {a.status === "late" && a.late_minutes ? ` (${a.late_minutes} menit)` : ""}
+                </span>
+              </div>
+            ))}
           </div>
-          <button
-            onClick={runAutoGenerate}
-            disabled={isPending}
-            className="shrink-0 bg-primary text-white px-4 py-2 rounded-md font-semibold disabled:opacity-50"
-          >
-            🔄 Generate Otomatis
-          </button>
         </div>
-        {autoMessage && <p className="text-sm mt-3">{autoMessage}</p>}
-        {autoResult && (
-          <div className="mt-3 space-y-2 text-sm">
-            {autoResult.summary.length > 0 && (
-              <ul className="list-disc list-inside text-text-muted">
-                {autoResult.summary.map((s) => (
-                  <li key={s.position}>
-                    <span className="font-semibold text-text">{s.position}</span> ({s.employeeCount}{" "}
-                    pegawai) — {s.note}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {autoResult.warnings.length > 0 && (
-              <div className="rounded-md bg-batik-gold/10 border border-batik-gold/40 p-2">
-                <p className="font-semibold text-xs mb-1">⚠️ Perlu perhatian:</p>
-                <ul className="list-disc list-inside text-xs text-text-muted">
-                  {autoResult.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
+      )}
+
+      {!readOnly && (
+        <div className="rounded-md border border-primary/40 bg-primary/5 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-primary">Generate Jadwal Otomatis</p>
+              <p className="text-xs text-text-muted mt-1 max-w-xl">
+                Susun jadwal shift untuk semua jabatan (Kasir, Bar, Kitchen, Waitres) sekaligus dari
+                data pegawai aktif saat ini: 6 hari kerja/1 libur bergantian (libur tidak pernah di
+                akhir pekan), Kasir di-backup Kapten saat libur, Kapten tanpa jam tetap, Sekuriti
+                selalu Shift Malam.
+              </p>
+            </div>
+            <button
+              onClick={runAutoGenerate}
+              disabled={isPending}
+              className="shrink-0 bg-primary text-white px-4 py-2 rounded-md font-semibold disabled:opacity-50"
+            >
+              🔄 Generate Otomatis
+            </button>
+          </div>
+          {autoMessage && <p className="text-sm mt-3">{autoMessage}</p>}
+          {autoResult && (
+            <div className="mt-3 space-y-2 text-sm">
+              {autoResult.summary.length > 0 && (
+                <ul className="list-disc list-inside text-text-muted">
+                  {autoResult.summary.map((s) => (
+                    <li key={s.position}>
+                      <span className="font-semibold text-text">{s.position}</span> ({s.employeeCount}{" "}
+                      pegawai) — {s.note}
+                    </li>
                   ))}
                 </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+              {autoResult.warnings.length > 0 && (
+                <div className="rounded-md bg-batik-gold/10 border border-batik-gold/40 p-2">
+                  <p className="font-semibold text-xs mb-1">⚠️ Perlu perhatian:</p>
+                  <ul className="list-disc list-inside text-xs text-text-muted">
+                    {autoResult.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-4">
         {employees.map((emp) => (
@@ -243,19 +304,39 @@ export default function ScheduleClient({
               <p className="font-semibold">
                 {emp.full_name} <span className="text-text-muted text-sm">({emp.employee_code})</span>
               </p>
-              <button
-                onClick={() => saveEmployeeRow(emp.id)}
-                disabled={isPending}
-                className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50"
-              >
-                Simpan Jadwal
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => saveEmployeeRow(emp.id)}
+                  disabled={isPending}
+                  className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50"
+                >
+                  Simpan Jadwal
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
               {DISPLAY_DAYS.map((day) => {
                 const cell = state[emp.id][day.value];
                 const selectValue = cell.isOff ? "off" : cell.shiftPreset || "";
+
+                if (readOnly) {
+                  return (
+                    <div key={day.value} className="border border-border rounded-md p-2">
+                      <p className="text-xs font-semibold text-text-muted mb-1">{day.label}</p>
+                      {cell.isOff ? (
+                        <p className="text-xs text-text-muted text-center py-1">Libur</p>
+                      ) : cell.shiftStart && cell.shiftEnd ? (
+                        <p className="text-xs text-center py-1">
+                          {cell.shiftStart} – {cell.shiftEnd === "00:00" ? "24:00" : cell.shiftEnd}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-text-muted text-center py-1">-</p>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={day.value} className="border border-border rounded-md p-2">
                     <p className="text-xs font-semibold text-text-muted mb-1">{day.label}</p>

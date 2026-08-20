@@ -392,21 +392,33 @@ function OrderDetailModal({
                   1. Verifikasi Item Pesanan <span className="text-xs text-text-muted font-normal">(cek kesesuaian dengan pelanggan)</span>
                 </p>
                 <div className="divide-y divide-border">
-                  {detail.items.map((item: any) => (
-                    <div key={item.id} className="py-2">
-                      <div className="flex justify-between">
-                        <span>
-                          {item.quantity}x {item.products?.name}
-                        </span>
-                        <span>{formatRupiah(item.quantity * Number(item.unit_price))}</span>
+                  {detail.items.map((item: any) => {
+                    const station = item.products?.station;
+                    return (
+                      <div key={item.id} className="py-2">
+                        <div className="flex justify-between">
+                          <span>
+                            {item.quantity}x {item.products?.name}
+                            {station && (
+                              <span
+                                className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-semibold align-middle ${
+                                  station === "kitchen" ? "bg-primary/15 text-primary" : "bg-secondary/15 text-secondary"
+                                }`}
+                              >
+                                {station === "kitchen" ? "🍳 Dapur" : "🍹 Bar"}
+                              </span>
+                            )}
+                          </span>
+                          <span>{formatRupiah(item.quantity * Number(item.unit_price))}</span>
+                        </div>
+                        {item.order_item_modifiers?.length > 0 && (
+                          <p className="text-xs text-text-muted">
+                            {item.order_item_modifiers.map((m: any) => m.name).join(", ")}
+                          </p>
+                        )}
                       </div>
-                      {item.order_item_modifiers?.length > 0 && (
-                        <p className="text-xs text-text-muted">
-                          {item.order_item_modifiers.map((m: any) => m.name).join(", ")}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -416,20 +428,20 @@ function OrderDetailModal({
               </div>
 
               <div>
-                <p className="text-sm font-semibold mb-2">2. Kirim ke Dapur / Cetak</p>
+                <p className="text-sm font-semibold mb-2">2. Proses Pesanan (otomatis ke Dapur/Bar) / Cetak</p>
                 <div className="flex flex-wrap gap-2">
                   {detail.order.status === "NEW" && (
                     <button
                       onClick={() =>
                         startTransition(async () => {
                           await sendToKitchenAction(orderId);
-                          setStatus("Order dikirim ke dapur.");
+                          setStatus("Order diteruskan — item makanan/camilan ke Dapur, minuman ke Bar.");
                           setDetail({ ...detail, order: { ...detail.order, status: "CONFIRMED" } });
                         })
                       }
                       className="text-sm px-3 py-2 rounded-md bg-secondary text-white font-semibold"
                     >
-                      🍳 Kirim ke Dapur
+                      🍳🍹 Proses ke Dapur/Bar
                     </button>
                   )}
                   <a

@@ -191,7 +191,7 @@ export async function runPayroll(periodStart: string, periodEnd: string) {
 
   const { data: employees, error: empError } = await supabase
     .from("employees")
-    .select("id, basic_salary, employment_type, daily_rate")
+    .select("id, basic_salary, employment_type, daily_rate, position_id, employee_positions(default_basic_salary)")
     .eq("status", "active")
     .is("deleted_at", null);
   if (empError) throw new Error(`Gagal memuat pegawai aktif: ${empError.message}`);
@@ -211,15 +211,19 @@ export async function runPayroll(periodStart: string, periodEnd: string) {
   const attendanceByEmployee = await getAttendanceSummaryByEmployee(periodStart, periodEnd);
 
   for (const emp of employees ?? []) {
-    const basicSalary = Number(emp.basic_salary);
     const attendance = attendanceByEmployee.get(emp.id) ?? EMPTY_ATTENDANCE;
 
-    // Pegawai CASUAL (pengganti sementara pegawai tidak masuk) diupah
-    // HARIAN — daily_rate x jumlah hari hadir pada periode ini — dan
-    // TIDAK ikut komponen payroll standar (Tunjangan Makan/Transport,
-    // BPJS, Bonus Omset, dst), karena komponen itu ditujukan untuk
-    // pegawai tetap. basic_salary dicatat 0 di slip supaya jelas
-    // sumber upahnya murni dari baris "Upah Harian Casual".
+    // GAJI POKOK OTOMATIS SESUAI JABATAN: kalau pegawai punya jabatan
+    // (position_id terisi), gaji pokok yang dipakai payroll SELALU ikut
+    // employee_positions.default_basic_salary yang berlaku SAAT payroll
+    // dijalankan (bukan angka lama yang tersimpan di employees.basic_salary
+    // saat pegawai dibuat) — jadi kalau Admin update gaji pokok jabatan di
+    // halaman Payroll, seluruh pegawai jabatan itu otomatis ikut naik/turun
+    // di periode payroll berikutnya tanpa perlu diedit satu-satu.
+    // employees.basic_salary tetap dipakai sebagai fallback HANYA untuk
+    // pegawai yang belum punya jabatan tercatat.
+    const positionRel = Array.isArray(emp.employee_positions) ? emp.employee_positions[0] : emp.employee_positions;
+    const basicSalary = emp.position_id && positionRel ? Number(positionRel.default_basic_salary) : Number(emp.basic_salary);
     if (emp.employment_type === "casual") {
       const dailyRate = Number(emp.daily_rate);
       const upahHarian = Math.round(dailyRate * attendance.daysPresent);

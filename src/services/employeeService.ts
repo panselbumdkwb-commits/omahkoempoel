@@ -197,6 +197,24 @@ export async function listAttendanceByDate(date: string) {
   return data ?? [];
 }
 
+/** Ringkasan absensi utk rentang tanggal (dipakai halaman Jadwal Shift
+ * supaya Admin/Captain/Owner bisa lihat siapa yang ijin/sakit/terlambat
+ * minggu ini berdampingan dengan jadwal shift-nya, tanpa perlu pindah ke
+ * halaman Absensi terpisah). Hanya status selain 'present' yang relevan
+ * ditampilkan sebagai sorotan, tapi query mengembalikan semua supaya
+ * pemanggil bisa filter sesuai kebutuhan. */
+export async function listAttendanceForRange(startDate: string, endDate: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("attendance")
+    .select("id, employee_id, attendance_date, status, late_minutes, notes, employees(full_name, employee_code)")
+    .gte("attendance_date", startDate)
+    .lte("attendance_date", endDate)
+    .order("attendance_date", { ascending: false });
+  if (error) throw new Error(`Gagal memuat ringkasan absensi: ${error.message}`);
+  return data ?? [];
+}
+
 /** Catat kehadiran manual oleh Admin/Owner (belum ada integrasi
  * biometrik/lokasi — sesuai catatan privasi di Bagian 31 master
  * prompt, perangkat semacam itu butuh persetujuan eksplisit dan

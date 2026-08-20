@@ -19,6 +19,25 @@ export default function AdminNav({ role }: { role: string | null }) {
       pathname === href ? "bg-primary text-white" : "text-text-muted"
     }`;
 
+  // CAPTAIN hanya dapat melihat Jadwal Shift & Absensi (ijin/keterlambatan)
+  // secara read-only — bukan akses admin penuh. Lihat migration 0014 &
+  // guard per-halaman (redirect ke /admin/schedule) untuk sisi server-nya.
+  if (role === "CAPTAIN") {
+    return (
+      <nav className="flex items-center gap-2 overflow-x-auto">
+        <Link href="/admin/schedule" className={linkClass("/admin/schedule")}>
+          Jadwal Shift
+        </Link>
+        <Link href="/admin/attendance" className={linkClass("/admin/attendance")}>
+          Absensi (Ijin/Terlambat)
+        </Link>
+        <button onClick={handleLogout} className="ml-auto px-3 py-2 text-sm text-danger">
+          Logout
+        </button>
+      </nav>
+    );
+  }
+
   return (
     <nav className="flex items-center gap-2 overflow-x-auto">
       <Link href="/admin" className={linkClass("/admin")}>

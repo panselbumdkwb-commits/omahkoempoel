@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { requireAdminOrOwner } from "@/lib/auth";
 import QrMejaClient from "./QrMejaClient";
 
 export default async function QrMejaPage() {
+  await requireAdminOrOwner();
   const supabase = createSupabaseServerClient();
   const { data: tables } = await supabase.from("tables").select("id, number").order("number");
 

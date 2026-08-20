@@ -132,8 +132,9 @@ export default function EmployeesClient({
           ))}
         </ul>
         <p className="text-xs text-text-muted mb-2">
-          Gaji pokok di sini jadi acuan auto-isi saat Tambah Pegawai Baru. Untuk mengubah acuan gaji
-          pokok jabatan yang sudah ada, buka halaman{" "}
+          Gaji pokok di sini otomatis dipakai untuk payroll seluruh pegawai TETAP di jabatan
+          tersebut — tidak perlu diedit satu-satu per pegawai. Untuk mengubah acuan gaji pokok
+          jabatan yang sudah ada, buka halaman{" "}
           <a href="/admin/payroll" className="text-primary underline">
             Payroll
           </a>
@@ -385,7 +386,7 @@ export default function EmployeesClient({
             min={0}
             value={newBasicSalary}
             onChange={(ev) => setNewBasicSalary(ev.target.value)}
-            placeholder="Gaji pokok (otomatis dari jabatan)"
+            placeholder="Gaji pokok fallback (dipakai HANYA kalau belum ada jabatan)"
             required
             className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
           />

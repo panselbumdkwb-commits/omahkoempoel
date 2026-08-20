@@ -246,9 +246,13 @@ export default function PayrollClient({
       <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5 print:hidden">
         <h2 className="font-heading text-xl text-primary mb-2">Gaji Pokok per Jabatan</h2>
         <p className="text-xs text-text-muted mb-4">
-          Acuan gaji pokok bulanan tiap jabatan. Dipakai untuk auto-isi form "Tambah Pegawai Baru" di
-          halaman Pegawai — mengubah nilai di sini TIDAK mengubah gaji pegawai yang sudah ada, hanya
-          jadi acuan baru untuk pegawai baru / penyesuaian manual berikutnya.
+          Acuan gaji pokok bulanan tiap jabatan.{" "}
+          <span className="font-semibold">
+            Payroll pegawai TETAP otomatis memakai angka di sini sesuai jabatan masing-masing
+          </span>{" "}
+          — jadi kalau nilainya diubah, seluruh pegawai jabatan tersebut ikut naik/turun mulai
+          periode payroll berikutnya, tanpa perlu diedit satu-satu di halaman Pegawai. Gaji pokok
+          per-pegawai di halaman Pegawai hanya jadi fallback untuk pegawai yang belum punya jabatan.
         </p>
         <div className="divide-y divide-border">
           {positions.map((p) => (

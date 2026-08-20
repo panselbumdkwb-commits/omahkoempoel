@@ -1,10 +1,12 @@
 import { getTodayStats } from "@/services/dashboardService";
+import { requireAdminOrOwner } from "@/lib/auth";
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
 export default async function DashboardPage() {
+  await requireAdminOrOwner();
   const stats = await getTodayStats();
   const maxPayment = Math.max(1, ...stats.paymentBreakdown.map((p) => p.amount));
   const maxProduct = Math.max(1, ...stats.topProducts.map((p) => p.quantity));

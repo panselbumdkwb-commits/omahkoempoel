@@ -27,10 +27,12 @@ export default function AttendanceClient({
   employees,
   attendance,
   date,
+  readOnly = false,
 }: {
   employees: Employee[];
   attendance: AttendanceRow[];
   date: string;
+  readOnly?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -51,17 +53,26 @@ export default function AttendanceClient({
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <h2 className="font-heading text-2xl text-primary">Absensi — {date}</h2>
-      <p className="text-xs text-text-muted">
-        Pencatatan manual oleh Admin/Owner. Untuk absensi mandiri oleh pegawai lewat tablet, buka{" "}
-        <a href="/kiosk/attendance" target="_blank" className="text-primary underline">
-          Mode Kios
-        </a>{" "}
-        (pegawai perlu PIN — atur lewat halaman Pegawai).
-      </p>
-      <p className="text-xs text-text-muted">
-        Potongan otomatis di payroll: Ijin −Rp30.000/hari, Sakit −Rp20.000/hari, Terlambat
-        −Rp5.000 per akumulasi 60 menit (isi kolom "Menit Telat" di bawah saat status Terlambat).
-      </p>
+      {readOnly ? (
+        <p className="text-xs text-text-muted">
+          Tampilan lihat-saja. Untuk mencatat/mengubah absensi (termasuk ijin & keterlambatan),
+          hubungi Admin/Owner.
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-text-muted">
+            Pencatatan manual oleh Admin/Owner. Untuk absensi mandiri oleh pegawai lewat tablet, buka{" "}
+            <a href="/kiosk/attendance" target="_blank" className="text-primary underline">
+              Mode Kios
+            </a>{" "}
+            (pegawai perlu PIN — atur lewat halaman Pegawai).
+          </p>
+          <p className="text-xs text-text-muted">
+            Potongan otomatis di payroll: Ijin −Rp30.000/hari, Sakit −Rp20.000/hari, Terlambat
+            −Rp5.000 per akumulasi 60 menit (isi kolom "Menit Telat" di bawah saat status Terlambat).
+          </p>
+        </>
+      )}
 
       {message && (
         <div className="rounded-md bg-surface dark:bg-surface-dark border border-border p-3 text-sm">
@@ -74,6 +85,36 @@ export default function AttendanceClient({
           .filter((e) => e.status === "active")
           .map((e) => {
             const existing = attendanceMap.get(e.id);
+
+            if (readOnly) {
+              return (
+                <div key={e.id} className="p-4 flex justify-between items-center gap-2 text-sm">
+                  <span className="font-semibold">{e.full_name}</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                        !existing || existing.status === "present"
+                          ? "bg-success/15 text-success"
+                          : existing.status === "late"
+                            ? "bg-batik-gold/20 text-wood-dark"
+                            : "bg-danger/15 text-danger"
+                      }`}
+                    >
+                      {STATUS_LABEL[existing?.status ?? "present"] ?? existing?.status}
+                      {existing?.status === "late" && existing.late_minutes ? ` (${existing.late_minutes} menit)` : ""}
+                    </span>
+                    {(existing?.clock_in || existing?.clock_out) && (
+                      <span className="text-xs text-text-muted">
+                        {existing?.clock_in ? existing.clock_in.slice(11, 16) : "-"}
+                        {" – "}
+                        {existing?.clock_out ? existing.clock_out.slice(11, 16) : "-"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <form
                 key={e.id}

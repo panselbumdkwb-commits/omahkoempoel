@@ -1,9 +1,9 @@
-import { getCurrentRole } from "@/lib/auth";
+import { requireAdminOrOwner } from "@/lib/auth";
 import { getShowDateTimeClock, getCafeOperatingHours, getEmployeeWorkHours } from "@/services/settingsService";
 import SettingsClient from "./SettingsClient";
 
 export default async function SettingsPage() {
-  const role = await getCurrentRole();
+  const role = await requireAdminOrOwner();
   const [showDateTimeClock, cafeOperatingHours, employeeWorkHours] = await Promise.all([
     getShowDateTimeClock(),
     getCafeOperatingHours(),

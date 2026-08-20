@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect("/login");
 
   const role = await getCurrentRole();
-  if (!role || !["SUPER_ADMIN", "OWNER"].includes(role)) {
+  if (!role || !["SUPER_ADMIN", "OWNER", "CAPTAIN"].includes(role)) {
     redirect("/pos");
   }
 

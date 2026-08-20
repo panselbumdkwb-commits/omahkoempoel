@@ -190,7 +190,7 @@ export async function getOrderDetail(orderId: string) {
 
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
-    .select("id, quantity, unit_price, notes, products(name), order_item_modifiers(name, price_adjustment)")
+    .select("id, quantity, unit_price, notes, products(name, station), order_item_modifiers(name, price_adjustment)")
     .eq("order_id", orderId);
   if (itemsError) throw new Error(`Gagal memuat item order: ${itemsError.message}`);
 
