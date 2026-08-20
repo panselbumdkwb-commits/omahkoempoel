@@ -48,13 +48,20 @@ function toCSV(report: SalesReport, financials?: FinancialStatement): string {
     lines.push("Laporan Laba Rugi");
     lines.push(`Pendapatan,${financials.revenue}`);
     lines.push("Biaya Operasional");
+    lines.push(`Belanja Bahan Baku (harian),${-financials.rawMaterialTotal}`);
     financials.operationalExpenses.forEach((e) => lines.push(`${e.name},${-e.amount}`));
+    if (financials.depreciationOperationalTotal > 0) {
+      lines.push(`Biaya Penyusutan Aset (operasional),${-financials.depreciationOperationalTotal}`);
+    }
     lines.push(`Total Biaya Operasional,${-financials.operationalExpensesTotal}`);
     lines.push(`Laba Kotor,${financials.grossProfit}`);
     lines.push(`Total Gaji (Gross),${-financials.payrollCost}`);
     lines.push(`Laba Operasional,${financials.operatingProfit}`);
     lines.push("Biaya Non-Operasional");
     financials.nonOperationalExpenses.forEach((e) => lines.push(`${e.name},${-e.amount}`));
+    if (financials.depreciationNonOperationalTotal > 0) {
+      lines.push(`Biaya Penyusutan Aset (non-operasional),${-financials.depreciationNonOperationalTotal}`);
+    }
     lines.push(`Total Biaya Non-Operasional,${-financials.nonOperationalExpensesTotal}`);
     lines.push(`Laba Bersih,${financials.netProfit}`);
     lines.push("");
@@ -256,12 +263,21 @@ export default function ReportsClient({
             <tbody>
               <PnlRow label="Pendapatan (Penjualan)" value={financials.revenue} bold />
               <PnlSectionHeader label="Biaya Operasional" />
+              <PnlRow
+                label="Belanja Bahan Baku (harian)"
+                value={-financials.rawMaterialTotal}
+                indent
+                note={financials.rawMaterialTotal === 0 ? "belum ada catatan di periode ini" : undefined}
+              />
               {financials.operationalExpenses.length === 0 ? (
-                <PnlEmptyRow />
+                <PnlEmptyRow note="belum ada biaya tetap/variabel lain" />
               ) : (
                 financials.operationalExpenses.map((e) => (
                   <PnlRow key={e.name} label={e.name} value={-e.amount} indent note={!e.recorded ? "belum dicatat" : undefined} />
                 ))
+              )}
+              {financials.depreciationOperationalTotal > 0 && (
+                <PnlRow label="Biaya Penyusutan Aset (operasional)" value={-financials.depreciationOperationalTotal} indent />
               )}
               <PnlRow label="Total Biaya Operasional" value={-financials.operationalExpensesTotal} indent bold />
               <PnlRow label="Laba Kotor" value={financials.grossProfit} bold accentTotal />
@@ -276,12 +292,15 @@ export default function ReportsClient({
               <PnlRow label="Laba Operasional" value={financials.operatingProfit} bold accentTotal />
 
               <PnlSectionHeader label="Biaya Non-Operasional" />
-              {financials.nonOperationalExpenses.length === 0 ? (
+              {financials.nonOperationalExpenses.length === 0 && financials.depreciationNonOperationalTotal === 0 ? (
                 <PnlEmptyRow note="belum ada biaya diklasifikasikan non-operasional" />
               ) : (
                 financials.nonOperationalExpenses.map((e) => (
                   <PnlRow key={e.name} label={e.name} value={-e.amount} indent note={!e.recorded ? "belum dicatat" : undefined} />
                 ))
+              )}
+              {financials.depreciationNonOperationalTotal > 0 && (
+                <PnlRow label="Biaya Penyusutan Aset (non-operasional)" value={-financials.depreciationNonOperationalTotal} indent />
               )}
               <PnlRow label="Total Biaya Non-Operasional" value={-financials.nonOperationalExpensesTotal} indent bold />
 
@@ -295,7 +314,9 @@ export default function ReportsClient({
           </table>
         </div>
         <p className="text-[11px] text-text-muted mt-3">
-          Kelola & klasifikasikan (Operasional/Non-Operasional) biaya di halaman{" "}
+          Kelola Belanja Bahan Baku &amp; Aset (Penyusutan) di{" "}
+          <a href="/admin/purchases" className="text-primary underline">halaman Belanja Bahan Baku &amp; Aset</a>,
+          dan klasifikasikan biaya tetap/variabel lain di{" "}
           <a href="/admin/payroll" className="text-primary underline">Payroll → Biaya Operasional</a>.
         </p>
       </section>
@@ -544,12 +565,22 @@ export default function ReportsClient({
                 <tr>
                   <td colSpan={2} className="pt-2 pb-1 text-xs font-bold uppercase">Biaya Operasional</td>
                 </tr>
+                <tr className="border-b border-black">
+                  <td className="py-1 pl-3">Belanja Bahan Baku (harian)</td>
+                  <td className="py-1 text-right">{formatRupiah(-financials.rawMaterialTotal)}</td>
+                </tr>
                 {financials.operationalExpenses.map((e) => (
                   <tr key={e.name} className="border-b border-black">
                     <td className="py-1 pl-3">{e.name}</td>
                     <td className="py-1 text-right">{formatRupiah(-e.amount)}</td>
                   </tr>
                 ))}
+                {financials.depreciationOperationalTotal > 0 && (
+                  <tr className="border-b border-black">
+                    <td className="py-1 pl-3">Biaya Penyusutan Aset (operasional)</td>
+                    <td className="py-1 text-right">{formatRupiah(-financials.depreciationOperationalTotal)}</td>
+                  </tr>
+                )}
                 <tr className="border-b border-black font-semibold">
                   <td className="py-1 pl-3">Total Biaya Operasional</td>
                   <td className="py-1 text-right">{formatRupiah(-financials.operationalExpensesTotal)}</td>
@@ -572,7 +603,7 @@ export default function ReportsClient({
                 <tr>
                   <td colSpan={2} className="pt-2 pb-1 text-xs font-bold uppercase">Biaya Non-Operasional</td>
                 </tr>
-                {financials.nonOperationalExpenses.length === 0 ? (
+                {financials.nonOperationalExpenses.length === 0 && financials.depreciationNonOperationalTotal === 0 ? (
                   <tr>
                     <td colSpan={2} className="py-1 pl-3 italic text-xs">Tidak ada</td>
                   </tr>
@@ -583,6 +614,12 @@ export default function ReportsClient({
                       <td className="py-1 text-right">{formatRupiah(-e.amount)}</td>
                     </tr>
                   ))
+                )}
+                {financials.depreciationNonOperationalTotal > 0 && (
+                  <tr className="border-b border-black">
+                    <td className="py-1 pl-3">Biaya Penyusutan Aset (non-operasional)</td>
+                    <td className="py-1 text-right">{formatRupiah(-financials.depreciationNonOperationalTotal)}</td>
+                  </tr>
                 )}
                 <tr className="border-t-2 border-black font-bold text-base">
                   <td className="py-2">LABA BERSIH</td>

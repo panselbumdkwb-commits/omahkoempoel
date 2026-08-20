@@ -1,6 +1,8 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { computeMonthlyExpenseTotal } from "@/services/operationalExpenseService";
+import { getPurchaseTotal } from "@/services/rawMaterialService";
+import { computeDepreciationForPeriod } from "@/services/depreciationService";
 
 export type SalesReport = {
   revenue: number;
@@ -112,10 +114,14 @@ export async function getSalesReport(startISO: string, endISO: string): Promise<
 
 export type FinancialStatement = {
   revenue: number;
+  rawMaterialTotal: number; // Belanja Bahan Baku (dihitung presisi harian)
   operationalExpenses: { name: string; category: string; amount: number; recorded: boolean }[];
-  operationalExpensesTotal: number;
+  operationalExpensesTotal: number; // sudah termasuk rawMaterialTotal + depreciationOperationalTotal
+  depreciationOperationalTotal: number;
+  depreciationNonOperationalTotal: number;
+  depreciationBreakdown: { name: string; category: string; amount: number }[];
   nonOperationalExpenses: { name: string; category: string; amount: number; recorded: boolean }[];
-  nonOperationalExpensesTotal: number;
+  nonOperationalExpensesTotal: number; // sudah termasuk depreciationNonOperationalTotal
   payrollCost: number;
   payrollPeriodsIncluded: number;
   grossProfit: number; // revenue - biaya operasional inti (di luar gaji)
@@ -125,31 +131,41 @@ export type FinancialStatement = {
 
 /**
  * Laporan Laba Rugi (P&L) sederhana untuk 1 periode: Pendapatan −
- * Biaya Operasional (listrik/air/internet/kebersihan/dst, sesuai
- * klasifikasi Owner di halaman Payroll) − Biaya Gaji Pegawai (dari
- * payroll_periods yang jatuh SEPENUHNYA di dalam rentang periode) −
- * Biaya Non-Operasional = Laba Bersih.
+ * Biaya Operasional (Belanja Bahan Baku harian + listrik/air/internet/
+ * kebersihan/dst sesuai klasifikasi Owner di halaman Payroll + Biaya
+ * Penyusutan Aset) − Biaya Gaji Pegawai (dari payroll_periods yang
+ * jatuh SEPENUHNYA di dalam rentang periode) − Biaya Non-Operasional
+ * = Laba Bersih.
+ *
+ * Biaya Penyusutan dihitung metode GARIS LURUS (straight-line, standar
+ * akuntansi paling umum untuk UMKM — lihat depreciationService.ts):
+ * (Harga Perolehan − Nilai Residu) / Umur Manfaat, dibebankan rata
+ * setiap bulan sepanjang umur manfaat aset.
  *
  * Catatan keterbatasan (lihat juga PHASE_FINANCE_HR.md bagian F):
- * belum ada modul Harga Pokok Penjualan (HPP/COGS) bahan baku —
- * begitu modul Inventory berjalan, "Laba Kotor" di bawah bisa
- * dikurangi HPP supaya lebih akurat secara akuntansi. Untuk sekarang,
- * "Laba Kotor" = Pendapatan − Biaya Operasional Non-Gaji, dan
- * perhitungan biaya operasional (fixed/percent/variable_manual)
- * memakai bulan kalender dari tanggal mulai periode — cukup akurat
- * untuk periode 1 bulan; untuk periode custom yang melintasi >1 bulan
- * kalender, angka biaya "fixed"/"variable_manual" mengikuti bulan
- * tanggal mulai (konsisten dengan payrollService & PayrollClient).
+ * belum ada modul Harga Pokok Penjualan (HPP/COGS) per-item bahan baku
+ * yang otomatis dari resep — Belanja Bahan Baku dicatat sebagai total
+ * pengeluaran kas periode berjalan (metode kas), bukan dialokasikan ke
+ * penjualan per produk. Untuk sekarang, "Laba Kotor" = Pendapatan −
+ * Biaya Operasional (termasuk Belanja Bahan Baku & Penyusutan
+ * Operasional). Perhitungan biaya operasional lain (fixed/percent/
+ * variable_manual) & penyusutan memakai bulan kalender dari tanggal
+ * mulai periode — cukup akurat untuk periode 1 bulan; Belanja Bahan
+ * Baku dihitung presisi per hari sehingga akurat untuk periode
+ * berapa pun.
  */
 export async function getFinancialStatement(startISO: string, endISO: string): Promise<FinancialStatement> {
   const startDate = startISO.slice(0, 10);
   const endDateExclusive = new Date(endISO);
   endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() - 1);
   const endDate = endDateExclusive.toISOString().slice(0, 10);
+  const safeEndDate = endDate >= startDate ? endDate : startDate;
 
-  const [salesReport, expenseTotal] = await Promise.all([
+  const [salesReport, expenseTotal, rawMaterialTotal, depreciation] = await Promise.all([
     getSalesReport(startISO, endISO),
-    computeMonthlyExpenseTotal(startDate, endDate > startDate ? endDate : startDate),
+    computeMonthlyExpenseTotal(startDate, safeEndDate),
+    getPurchaseTotal(startDate, safeEndDate),
+    computeDepreciationForPeriod(startDate),
   ]);
 
   const operationalExpenses = expenseTotal.breakdown
@@ -159,12 +175,19 @@ export async function getFinancialStatement(startISO: string, endISO: string): P
     .filter((b) => b.expense_type === "non_operational")
     .map((b) => ({ name: b.name, category: b.category, amount: b.amount, recorded: b.recorded }));
 
+  const depreciationOperationalTotal = depreciation.breakdown
+    .filter((d) => d.expense_type === "operational")
+    .reduce((s, d) => s + d.amount, 0);
+  const depreciationNonOperationalTotal = depreciation.breakdown
+    .filter((d) => d.expense_type === "non_operational")
+    .reduce((s, d) => s + d.amount, 0);
+
   const supabase = createSupabaseServerClient();
   const { data: periods } = await supabase
     .from("payroll_periods")
     .select("id, period_start, period_end")
     .gte("period_start", startDate)
-    .lte("period_end", endDate <= startDate ? startDate : endDate);
+    .lte("period_end", safeEndDate);
 
   let payrollCost = 0;
   let payrollPeriodsIncluded = 0;
@@ -175,16 +198,21 @@ export async function getFinancialStatement(startISO: string, endISO: string): P
     payrollPeriodsIncluded = periods.length;
   }
 
-  const operationalExpensesTotal = expenseTotal.operationalTotal;
-  const nonOperationalExpensesTotal = expenseTotal.nonOperationalTotal;
+  const operationalExpensesTotal =
+    expenseTotal.operationalTotal + rawMaterialTotal + depreciationOperationalTotal;
+  const nonOperationalExpensesTotal = expenseTotal.nonOperationalTotal + depreciationNonOperationalTotal;
   const grossProfit = salesReport.revenue - operationalExpensesTotal;
   const operatingProfit = grossProfit - payrollCost;
   const netProfit = operatingProfit - nonOperationalExpensesTotal;
 
   return {
     revenue: salesReport.revenue,
+    rawMaterialTotal,
     operationalExpenses,
     operationalExpensesTotal,
+    depreciationOperationalTotal,
+    depreciationNonOperationalTotal,
+    depreciationBreakdown: depreciation.breakdown.map((d) => ({ name: d.name, category: d.category, amount: d.amount })),
     nonOperationalExpenses,
     nonOperationalExpensesTotal,
     payrollCost,

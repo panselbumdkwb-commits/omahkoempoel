@@ -34,6 +34,7 @@ export default function AdminNav({ role }: { role: string | null }) {
     { href: "/admin/menu", label: "Kelola Menu" },
     { href: "/admin/employees", label: "Pegawai" },
     { href: "/admin/attendance", label: "Absensi" },
+    { href: "/admin/purchases", label: "Belanja Bahan Baku" },
     { href: "/admin/payroll", label: "Payroll" },
     { href: "/admin/schedule", label: "Jadwal Kerja" },
     { href: "/admin/qr-meja", label: "QR Meja" },

@@ -6,7 +6,7 @@ export default async function KitchenLayout({ children }: { children: React.Reac
   if (!user) redirect("/login");
 
   const role = await getCurrentRole();
-  if (!role || !["SUPER_ADMIN", "OWNER", "KITCHEN"].includes(role)) {
+  if (!role || !["SUPER_ADMIN", "OWNER", "KITCHEN", "CAPTAIN"].includes(role)) {
     redirect("/pos");
   }
 

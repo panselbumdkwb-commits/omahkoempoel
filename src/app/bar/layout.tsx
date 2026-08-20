@@ -6,7 +6,7 @@ export default async function BarLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   const role = await getCurrentRole();
-  if (!role || !["SUPER_ADMIN", "OWNER", "BAR"].includes(role)) {
+  if (!role || !["SUPER_ADMIN", "OWNER", "BAR", "CAPTAIN"].includes(role)) {
     redirect("/pos");
   }
 

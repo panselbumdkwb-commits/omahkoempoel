@@ -26,7 +26,9 @@ export default function LoginForm({ showDateTimeClock }: { showDateTimeClock: bo
     }
 
     // Arahkan berdasarkan role: Owner/Super Admin ke Dashboard,
-    // Kasir/Front Serve ke interface transaksi (/pos).
+    // Captain ke Kasir (rule & role utamanya) — dia bisa pindah ke
+    // menu 'Lihat Data' dari POS untuk akses view Laporan/Pegawai/dst,
+    // Kasir/Front Serve juga ke interface transaksi (/pos).
     const { data: role } = await supabase.rpc("fn_current_role_code");
     setLoading(false);
 
