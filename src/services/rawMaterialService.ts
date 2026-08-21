@@ -1,34 +1,48 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
+export type PurchaseCategory = "bahan_baku" | "peralatan_perlengkapan" | "rutin_lainnya";
+
+export const PURCHASE_CATEGORY_LABEL: Record<PurchaseCategory, string> = {
+  bahan_baku: "Bahan Baku",
+  peralatan_perlengkapan: "Peralatan & Perlengkapan",
+  rutin_lainnya: "Belanja Rutin Lainnya",
+};
+
 export type RawMaterialPurchase = {
   id: string;
   purchase_date: string; // YYYY-MM-DD
   item_name: string;
+  category: PurchaseCategory;
   quantity: number | null;
   unit: string | null;
   unit_price: number | null;
   amount: number;
   supplier: string | null;
   notes: string | null;
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
 };
 
 export async function listPurchases(startDate: string, endDate: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("raw_material_purchases")
-    .select("id, purchase_date, item_name, quantity, unit, unit_price, amount, supplier, notes")
+    .select(
+      "id, purchase_date, item_name, category, quantity, unit, unit_price, amount, supplier, notes, acknowledged_by, acknowledged_at"
+    )
     .gte("purchase_date", startDate)
     .lte("purchase_date", endDate)
     .order("purchase_date", { ascending: false })
     .order("created_at", { ascending: false });
-  if (error) throw new Error(`Gagal memuat belanja bahan baku: ${error.message}`);
+  if (error) throw new Error(`Gagal memuat belanja: ${error.message}`);
   return (data ?? []) as RawMaterialPurchase[];
 }
 
 export async function createPurchase(input: {
   purchaseDate: string;
   itemName: string;
+  category?: PurchaseCategory;
   quantity?: number | null;
   unit?: string | null;
   unitPrice?: number | null;
@@ -48,6 +62,7 @@ export async function createPurchase(input: {
     business_id: business.id,
     purchase_date: input.purchaseDate,
     item_name: input.itemName.trim(),
+    category: input.category ?? "bahan_baku",
     quantity: input.quantity ?? null,
     unit: input.unit ?? null,
     unit_price: input.unitPrice ?? null,
@@ -55,13 +70,30 @@ export async function createPurchase(input: {
     supplier: input.supplier?.trim() || null,
     notes: input.notes?.trim() || null,
   });
-  if (error) throw new Error(`Gagal mencatat belanja bahan baku: ${error.message}`);
+  if (error) throw new Error(`Gagal mencatat belanja: ${error.message}`);
 }
 
 export async function deletePurchase(id: string) {
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("raw_material_purchases").delete().eq("id", id);
   if (error) throw new Error(`Gagal menghapus catatan belanja: ${error.message}`);
+}
+
+/** Admin/Owner menandai 1 catatan belanja (biasanya yang dicatat
+ * Captain) sebagai "sudah diketahui" — bukan approval sebelum dicatat,
+ * tapi transparansi setelahnya supaya semua belanja tetap terpantau. */
+export async function acknowledgePurchase(id: string) {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Sesi tidak valid.");
+
+  const { error } = await supabase
+    .from("raw_material_purchases")
+    .update({ acknowledged_by: user.id, acknowledged_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(`Gagal menandai belanja sebagai diketahui: ${error.message}`);
 }
 
 /** Total belanja bahan baku untuk 1 rentang tanggal (dipakai Laporan
