@@ -131,7 +131,7 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
           {mode === "hadir" ? (
             <>
               <p className="text-xs text-wood-mid">
-                Absen masuk hanya bisa dilakukan dalam radius 2 meter dari Kedai — pastikan GPS aktif.
+                Absen masuk hanya bisa dilakukan dalam radius 10 meter dari Kedai — pastikan GPS aktif.
               </p>
               <div className="flex gap-2">
                 <button onClick={() => clock("in")} disabled={isPending} className="flex-1 bg-success text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">

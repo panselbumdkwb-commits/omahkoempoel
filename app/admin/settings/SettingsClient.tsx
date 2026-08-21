@@ -306,12 +306,12 @@ export default function SettingsClient({
         )}
       </section>
 
-      {/* KOORDINAT LOKASI — dasar validasi radius 2 meter absen masuk lewat HP pribadi */}
+      {/* KOORDINAT LOKASI — dasar validasi radius 10 meter absen masuk lewat HP pribadi */}
       <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
         <p className="font-semibold mb-1">Koordinat Lokasi Kedai</p>
         <p className="text-sm text-text-muted mb-3">
           Dipakai untuk memvalidasi absen masuk lewat HP pribadi pegawai — pegawai wajib berada dalam
-          radius 2 meter dari titik ini. Ambil koordinat dari Google Maps: cari lokasi Kedai, klik-kanan
+          radius 10 meter dari titik ini. Ambil koordinat dari Google Maps: cari lokasi Kedai, klik-kanan
           titik yang tepat, lalu salin angka lintang/bujur yang muncul.
         </p>
         <div className="grid grid-cols-2 gap-2">
