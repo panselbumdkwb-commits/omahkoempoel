@@ -1,0 +1,67 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import * as catalogService from "@/services/catalogService";
+
+export async function createCategoryAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const sortOrder = Number(formData.get("sortOrder") ?? 0);
+  const defaultStation = String(formData.get("defaultStation") ?? "kitchen") as catalogService.Station;
+  if (!name) throw new Error("Nama kategori wajib diisi.");
+  await catalogService.createCategory(name, sortOrder, defaultStation);
+  revalidatePath("/admin/menu");
+}
+
+export async function createProductAction(formData: FormData) {
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const sku = String(formData.get("sku") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const price = Number(formData.get("price") ?? 0);
+  const stationRaw = String(formData.get("station") ?? "");
+  const station = stationRaw ? (stationRaw as catalogService.Station) : undefined;
+
+  if (!categoryId || !sku || !name) throw new Error("Kategori, SKU, dan nama wajib diisi.");
+
+  await catalogService.createProduct({ categoryId, sku, name, description, price, station });
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  revalidatePath("/kitchen");
+  revalidatePath("/bar");
+}
+
+export async function updateProductAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const price = Number(formData.get("price") ?? 0);
+  const categoryId = String(formData.get("categoryId") ?? "");
+  const station = String(formData.get("station") ?? "kitchen") as catalogService.Station;
+
+  if (!id) throw new Error("ID produk tidak valid.");
+
+  await catalogService.updateProduct(id, { name, description, price, categoryId, station });
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  revalidatePath("/kitchen");
+  revalidatePath("/bar");
+}
+
+export async function toggleProductStatusAction(id: string, currentStatus: string) {
+  const next = currentStatus === "active" ? "inactive" : "active";
+  await catalogService.setProductStatus(id, next);
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+}
+
+export async function uploadProductImageAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const file = formData.get("file") as File | null;
+
+  if (!productId) throw new Error("ID produk tidak valid.");
+  if (!file || file.size === 0) throw new Error("Silakan pilih file foto terlebih dahulu.");
+
+  await catalogService.uploadProductImage(productId, file);
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+}

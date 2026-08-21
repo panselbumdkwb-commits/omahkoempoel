@@ -1,0 +1,117 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-text dark:bg-background-dark dark:text-text-dark;
+    font-family: "Inter", sans-serif;
+  }
+  h1, h2, h3 {
+    font-family: "Fraunces", serif;
+  }
+}
+
+@layer utilities {
+  /* Tekstur kayu jati — dibangun dari layer gradient, bukan foto,
+     supaya ringan dan konsisten di semua perangkat/touchscreen. */
+  .bg-wood-grain {
+    background-color: #3e2723;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.12) 0px,
+        rgba(0, 0, 0, 0.12) 1px,
+        transparent 1px,
+        transparent 7px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(201, 161, 90, 0.05) 0px,
+        rgba(201, 161, 90, 0.05) 2px,
+        transparent 2px,
+        transparent 40px
+      ),
+      radial-gradient(ellipse at top, rgba(141, 106, 66, 0.35), transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(0, 0, 0, 0.45), transparent 70%);
+  }
+}
+
+
+/* Animasi masuk untuk toast notifikasi order (lihat OrderNotifications.tsx) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   DESIGN SYSTEM MODERN — dipakai di seluruh halaman /admin supaya
+   tampilan konsisten, profesional, dan lebih "hidup" (kartu dengan
+   depth, gradient tipis, micro-interaction) tanpa mengubah identitas
+   warna coklat kayu/batik khas Omah Koempoel yang sudah ada.
+   ============================================================ */
+@layer utilities {
+  .card-modern {
+    @apply relative rounded-2xl border border-border bg-surface dark:bg-surface-dark dark:border-white/10
+      shadow-[0_1px_2px_rgba(43,36,32,0.04),0_8px_24px_-12px_rgba(43,36,32,0.12)]
+      transition-shadow duration-200;
+  }
+  .card-modern:hover {
+    @apply shadow-[0_2px_4px_rgba(43,36,32,0.06),0_16px_32px_-14px_rgba(43,36,32,0.18)];
+  }
+  .stat-card-modern {
+    @apply card-modern p-5 flex flex-col gap-1.5 overflow-hidden;
+  }
+  .stat-card-modern::before {
+    content: "";
+    @apply absolute -right-6 -top-6 w-20 h-20 rounded-full bg-primary/10 blur-2xl pointer-events-none;
+  }
+  .pill-nav-link {
+    @apply px-3.5 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-150;
+  }
+  .pill-nav-link-active {
+    @apply bg-gradient-to-br from-primary to-[#8c4a15] text-white shadow-sm shadow-primary/30;
+  }
+  .pill-nav-link-inactive {
+    @apply text-text-muted hover:bg-primary/10 hover:text-primary;
+  }
+  .badge-modern {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+  .btn-primary-modern {
+    @apply px-4 py-2.5 rounded-xl bg-gradient-to-br from-primary to-[#8c4a15] text-white text-sm font-semibold
+      shadow-sm shadow-primary/30 hover:shadow-md hover:shadow-primary/40 active:scale-[0.98]
+      transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-ghost-modern {
+    @apply px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-text
+      hover:bg-primary/5 hover:border-primary/40 active:scale-[0.98] transition-all duration-150;
+  }
+  .section-title-modern {
+    @apply font-heading text-lg sm:text-xl text-primary flex items-center gap-2;
+  }
+  .glass-header {
+    @apply backdrop-blur-md bg-surface/80 dark:bg-surface-dark/80 sticky top-0 z-20;
+  }
+}
+
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-float-in {
+  animation: floatIn 0.35s ease-out both;
+}
