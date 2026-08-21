@@ -186,7 +186,7 @@ export async function setKedaiProfile(input: KedaiProfile) {
 }
 
 // ----------------------------------------------------------
-// KOORDINAT LOKASI KEDAI — dasar validasi radius 2 meter untuk absen
+// KOORDINAT LOKASI KEDAI — dasar validasi radius 10 meter untuk absen
 // masuk lewat HP pribadi pegawai (lihat mobileAttendanceService.ts).
 // ----------------------------------------------------------
 export async function getBusinessLocation(): Promise<{ latitude: number | null; longitude: number | null }> {

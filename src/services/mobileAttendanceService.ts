@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifyPin } from "@/lib/pin";
 import { getJakartaTodayRange } from "@/lib/timezone";
 
-const GEOFENCE_RADIUS_METERS = 2;
+const GEOFENCE_RADIUS_METERS = 10;
 
 function todayJakartaDateString(): string {
   const { startUTC } = getJakartaTodayRange();
@@ -37,7 +37,7 @@ export async function listVerifiedMobileEmployees() {
 
 /**
  * Absen masuk/pulang lewat HP pribadi pegawai. WAJIB berada dalam
- * radius 2 meter dari lokasi Kedai (business.latitude/longitude,
+ * radius 10 meter dari lokasi Kedai (business.latitude/longitude,
  * diisi Super Admin di halaman Pengaturan) — beda dengan kios yang
  * tidak butuh cek lokasi karena perangkatnya memang sudah di Kedai.
  */
