@@ -7,12 +7,15 @@ import {
   toggleUserStatusAction,
   updateUserProfileAction,
   resetUserPasswordAction,
+  updateUserEmailAction,
+  deleteUserAction,
 } from "./actions";
 
 type Role = { id: string; code: string; name: string };
 type UserRow = {
   id: string;
   full_name: string;
+  email: string;
   phone: string | null;
   status: string;
   created_at: string;
@@ -48,6 +51,20 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
           )} (catat sekarang, tidak ditampilkan lagi).`
         );
         setGeneratedPassword(generatePassword());
+      } catch (err: any) {
+        setMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function handleDelete(u: UserRow) {
+    const ok = window.confirm(
+      `Hapus akun "${u.full_name}" (${u.email})? Akun ini tidak akan bisa login lagi dan hilang dari daftar. Riwayat data terkait (pegawai/payroll/absensi jika ada) tetap tersimpan untuk arsip.`
+    );
+    if (!ok) return;
+    startTransition(async () => {
+      try {
+        await deleteUserAction(u.id);
       } catch (err: any) {
         setMessage(`Gagal: ${err.message}`);
       }
@@ -129,8 +146,9 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
                   {u.status !== "active" && <span className="ml-2 text-xs text-danger">Nonaktif</span>}
                 </p>
                 <p className="text-sm text-text-muted">{roleName(u)}</p>
+                <p className="text-xs text-text-muted">{u.email}</p>
               </div>
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-2 items-center flex-wrap justify-end">
                 <button
                   onClick={() => setEditingUser(u)}
                   className="text-xs px-2 py-1.5 rounded-md border border-border font-semibold text-primary"
@@ -142,6 +160,12 @@ export default function UsersClient({ users, roles }: { users: UserRow[]; roles:
                   className="text-xs px-2 py-1.5 rounded-md border border-border"
                 >
                   {u.status === "active" ? "Nonaktifkan" : "Aktifkan"}
+                </button>
+                <button
+                  onClick={() => handleDelete(u)}
+                  className="text-xs px-2 py-1.5 rounded-md border border-danger text-danger font-semibold"
+                >
+                  Hapus
                 </button>
               </div>
             </div>
@@ -168,10 +192,30 @@ function EditUserModal({
   const currentRoleCode = Array.isArray(user.roles) ? user.roles[0]?.code : user.roles?.code;
   const [fullName, setFullName] = useState(user.full_name);
   const [roleId, setRoleId] = useState(roles.find((r) => r.code === currentRoleCode)?.id ?? "");
+  const [newEmail, setNewEmail] = useState(user.email);
   const [newPassword, setNewPassword] = useState("");
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function saveEmail() {
+    if (!newEmail.trim()) {
+      setEmailMsg("Email tidak boleh kosong.");
+      return;
+    }
+    const fd = new FormData();
+    fd.set("profileId", user.id);
+    fd.set("newEmail", newEmail.trim());
+    startTransition(async () => {
+      try {
+        await updateUserEmailAction(fd);
+        setEmailMsg("Email login tersimpan.");
+      } catch (err: any) {
+        setEmailMsg(`Gagal: ${err.message}`);
+      }
+    });
+  }
 
   function saveProfile() {
     const fd = new FormData();
@@ -244,6 +288,29 @@ function EditUserModal({
               Simpan Nama & Role
             </button>
             {profileMsg && <p className="text-xs text-text-muted">{profileMsg}</p>}
+          </div>
+
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-sm font-semibold">Email Login</p>
+            <input
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              type="email"
+              placeholder="Email login"
+              className="w-full border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+            />
+            <button
+              onClick={saveEmail}
+              disabled={isPending}
+              className="w-full bg-primary text-white py-2 rounded-md font-semibold disabled:opacity-50"
+            >
+              Simpan Email
+            </button>
+            {emailMsg && <p className="text-xs text-text-muted">{emailMsg}</p>}
+            <p className="text-xs text-text-muted">
+              Login memakai email, jadi pastikan email baru benar sebelum menyimpan — pegawai
+              wajib pakai email ini untuk login berikutnya.
+            </p>
           </div>
 
           <div className="space-y-2 border-t border-border pt-4">

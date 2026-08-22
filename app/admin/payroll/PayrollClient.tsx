@@ -9,6 +9,8 @@ import {
   listPayrollItemsAction,
   approvePayrollPeriodAction,
   updatePositionSalaryAction,
+  deletePayrollPeriodAction,
+  deletePositionAction,
 } from "./actions";
 
 type CalcType =
@@ -95,6 +97,36 @@ export default function PayrollClient({
       try {
         const period = await runPayrollAction(fd);
         setMessage(`Payroll periode ${period.period_start} s/d ${period.period_end} berhasil dihitung.`);
+      } catch (err: any) {
+        setMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function deletePosition(p: Position) {
+    const ok = window.confirm(`Hapus jabatan "${p.name}" dari daftar Gaji Pokok per Jabatan?`);
+    if (!ok) return;
+    startTransition(async () => {
+      try {
+        await deletePositionAction(p.id);
+      } catch (err: any) {
+        setMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function deletePeriod(p: Period) {
+    const ok = window.confirm(
+      `Hapus periode payroll ${p.period_start} s/d ${p.period_end} beserta seluruh slip gajinya? Tindakan ini tidak bisa dibatalkan.`
+    );
+    if (!ok) return;
+    startTransition(async () => {
+      try {
+        await deletePayrollPeriodAction(p.id);
+        if (selectedPeriod === p.id) {
+          setSelectedPeriod(null);
+          setItems(null);
+        }
       } catch (err: any) {
         setMessage(`Gagal: ${err.message}`);
       }
@@ -219,6 +251,12 @@ export default function PayrollClient({
                   >
                     Edit
                   </button>
+                  <button
+                    onClick={() => deletePosition(p)}
+                    className="text-xs px-2 py-1.5 rounded-md border border-danger text-danger font-semibold"
+                  >
+                    Hapus
+                  </button>
                 </div>
               )}
             </div>
@@ -252,12 +290,23 @@ export default function PayrollClient({
         <h2 className="section-title-modern text-xl mb-4">Riwayat Periode Payroll</h2>
         <div className="divide-y divide-border">
           {periods.map((p) => (
-            <button key={p.id} onClick={() => openPeriod(p.id)} className="w-full text-left py-2 flex justify-between text-sm hover:text-primary">
-              <span>
-                {p.period_start} s/d {p.period_end}
-              </span>
-              <span className="text-text-muted">{p.status}</span>
-            </button>
+            <div key={p.id} className="py-2 flex justify-between items-center gap-2 text-sm">
+              <button
+                onClick={() => openPeriod(p.id)}
+                className="flex-1 text-left hover:text-primary flex justify-between items-center gap-2"
+              >
+                <span>
+                  {p.period_start} s/d {p.period_end}
+                </span>
+                <span className="text-text-muted">{p.status}</span>
+              </button>
+              <button
+                onClick={() => deletePeriod(p)}
+                className="text-xs px-2 py-1.5 rounded-md border border-danger text-danger font-semibold whitespace-nowrap"
+              >
+                Hapus
+              </button>
+            </div>
           ))}
         </div>
       </section>

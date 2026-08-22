@@ -42,6 +42,22 @@ export async function approvePayrollPeriodAction(periodId: string) {
   revalidatePath("/admin/payroll");
 }
 
+/** Hapus 1 periode payroll dari "Riwayat Periode Payroll" beserta
+ * slip gajinya — lihat payrollService.deletePayrollPeriod. */
+export async function deletePayrollPeriodAction(periodId: string) {
+  await payrollService.deletePayrollPeriod(periodId);
+  revalidatePath("/admin/payroll");
+}
+
+/** Hapus 1 jabatan dari master "Gaji Pokok per Jabatan" — lihat
+ * employeeService.deletePosition untuk aturan (gagal kalau masih
+ * dipakai pegawai). */
+export async function deletePositionAction(id: string) {
+  await employeeService.deletePosition(id);
+  revalidatePath("/admin/payroll");
+  revalidatePath("/admin/employees");
+}
+
 /** Ubah acuan gaji pokok bulanan 1 jabatan langsung dari halaman Payroll
  * (data yang sama dengan halaman Pegawai — lihat employeeService). */
 export async function updatePositionSalaryAction(formData: FormData) {

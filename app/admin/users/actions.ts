@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentRole } from "@/lib/auth";
+import { getCurrentRole, getCurrentUser } from "@/lib/auth";
 import * as userService from "@/services/userService";
 
 async function requireSuperAdmin() {
@@ -63,21 +63,24 @@ export async function toggleUserStatusAction(profileId: string, currentStatus: s
   revalidatePath("/admin/users");
 }
 
-/** Ubah email login dari modal "Edit" di Kelola User (login pakai
- * email, bukan username). */
+/** Edit email login dari modal "Edit" di Kelola User — login pakai
+ * email, jadi ini yang paling sering perlu diubah (typo, ganti nomor/
+ * alamat email pegawai, dst). */
 export async function updateUserEmailAction(formData: FormData) {
   await requireSuperAdmin();
   const profileId = String(formData.get("profileId") ?? "");
-  const email = String(formData.get("email") ?? "").trim();
-  if (!profileId || !email) throw new Error("Email wajib diisi.");
-  await userService.updateUserEmail(profileId, email);
+  const newEmail = String(formData.get("newEmail") ?? "").trim();
+  if (!profileId || !newEmail) throw new Error("Email baru wajib diisi.");
+  await userService.updateUserEmail(profileId, newEmail);
   revalidatePath("/admin/users");
 }
 
-/** Hapus akun yang sudah tidak dipakai dari Kelola User. */
+/** Hapus akun staf yang sudah tidak dipakai. Lihat catatan di
+ * userService.deleteUserAccount untuk kenapa ini soft-delete + ban,
+ * bukan hard delete row profiles. */
 export async function deleteUserAction(profileId: string) {
   await requireSuperAdmin();
-  if (!profileId) throw new Error("Akun tidak valid.");
-  await userService.deleteUserAccount(profileId);
+  const currentUser = await getCurrentUser();
+  await userService.deleteUserAccount(profileId, currentUser?.id ?? null);
   revalidatePath("/admin/users");
 }
