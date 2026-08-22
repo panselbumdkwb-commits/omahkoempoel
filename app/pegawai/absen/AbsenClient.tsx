@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { mobileClockAction, submitLeaveAction } from "./actions";
 import CameraCapture from "@/components/CameraCapture";
@@ -16,6 +16,35 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [locating, setLocating] = useState(false);
   const [cameraFor, setCameraFor] = useState<"in" | "out" | null>(null);
+
+  // Prompt "Tambah ke Layar Utama" (Android/Chrome). Di iOS Safari tombol ini
+  // tidak muncul karena iOS belum mendukung event ini — instruksi manual
+  // ditampilkan sebagai gantinya (lihat isIOS di bawah).
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setInstalled(true));
+
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
+    setInstalled(standalone);
+    setIsIOS(/iphone|ipad|ipod/i.test(window.navigator.userAgent) && !standalone);
+
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  function handleInstallClick() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.finally(() => setInstallPrompt(null));
+  }
 
   function getLocation(): Promise<GeolocationPosition> {
     return new Promise((resolve, reject) => {
@@ -83,6 +112,22 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
       <div className="w-full max-w-sm bg-parchment rounded-2xl shadow-xl p-6">
         <h1 className="font-ukir text-2xl text-wood-dark mb-1 text-center">Absen Mandiri</h1>
         <p className="text-sm text-wood-mid text-center mb-4">Kedai Omah Koempoel — lewat HP pribadi</p>
+
+        {!installed && installPrompt && (
+          <button
+            onClick={handleInstallClick}
+            className="w-full mb-4 flex items-center justify-center gap-2 bg-wood-dark text-parchment text-sm font-semibold py-2.5 rounded-lg"
+          >
+            📲 Tambah ke Layar Utama HP
+          </button>
+        )}
+        {!installed && isIOS && (
+          <p className="text-xs text-wood-mid text-center mb-4 bg-white border border-wood-light rounded-lg p-2.5">
+            Di iPhone: buka menu <span className="font-semibold">Bagikan</span> (ikon kotak dengan panah ke atas) lalu
+            pilih <span className="font-semibold">Tambah ke Layar Utama</span> supaya bisa dibuka langsung seperti
+            aplikasi.
+          </p>
+        )}
 
         <div className="flex gap-2 mb-4">
           <button
