@@ -31,6 +31,18 @@ export function formatJakartaDateTime(date: Date | string): string {
   }).format(new Date(date)) + " WIB";
 }
 
+/** Tanggal hari ini menurut WIB, format YYYY-MM-DD — dipakai sebagai kunci
+ * hari untuk Kas Kecil Harian (petty_cash_days.cash_date) supaya "hari ini"
+ * konsisten dengan WIB, bukan ikut jam server yang bisa UTC. */
+export function getJakartaTodayDateString(): string {
+  const { startUTC } = getJakartaTodayRange();
+  const jakartaShifted = new Date(startUTC.getTime() + JAKARTA_OFFSET_MS);
+  const y = jakartaShifted.getUTCFullYear();
+  const m = String(jakartaShifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(jakartaShifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Hari ini (0=Minggu..6=Sabtu, sama seperti Date.getDay()) menurut WIB —
  * dipakai untuk mencocokkan jadwal kerja pegawai di kiosk absensi, jangan
  * pakai Date.getDay() langsung karena itu ikut zona waktu server/browser. */

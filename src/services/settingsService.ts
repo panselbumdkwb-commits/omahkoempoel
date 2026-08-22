@@ -11,6 +11,7 @@ const KEY_KEDAI_ADDRESS = "kedai_address";
 const KEY_KEDAI_MAPS_URL = "kedai_maps_url";
 const KEY_KEDAI_INSTAGRAM = "kedai_instagram";
 const KEY_KEDAI_TIKTOK = "kedai_tiktok";
+const KEY_PETTY_CASH_DEFAULT_AMOUNT = "petty_cash_default_amount";
 
 /**
  * Baca setelan tampilan jam Hari/Tanggal/Waktu. Dipakai lewat supabaseAdmin
@@ -192,6 +193,55 @@ export async function setKedaiProfile(input: KedaiProfile) {
 export async function getBusinessLocation(): Promise<{ latitude: number | null; longitude: number | null }> {
   const { data: business } = await supabaseAdmin.from("business").select("latitude, longitude").limit(1).single();
   return { latitude: business?.latitude ?? null, longitude: business?.longitude ?? null };
+}
+
+// ----------------------------------------------------------
+// KAS KECIL HARIAN — nominal default (saran awal) yang muncul saat
+// SUPER_ADMIN/OWNER membuka Kas Kecil hari itu di halaman Kasir/POS.
+// Ini HANYA saran/prefill — nominal aktual harian tetap ditentukan
+// (dan bisa diubah) oleh Owner/Admin saat membuka hari itu; lihat
+// pettyCashService.openPettyCashDay.
+// ----------------------------------------------------------
+export async function getPettyCashDefaultAmount(): Promise<number> {
+  const { data: business } = await supabaseAdmin.from("business").select("id").limit(1).single();
+  if (!business) return 0;
+
+  const { data } = await supabaseAdmin
+    .from("system_settings")
+    .select("value")
+    .eq("business_id", business.id)
+    .eq("key", KEY_PETTY_CASH_DEFAULT_AMOUNT)
+    .maybeSingle();
+
+  if (!data) return 0;
+  const n = Number(data.value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function setPettyCashDefaultAmount(value: number) {
+  if (!Number.isFinite(value) || value < 0) throw new Error("Nominal default Kas Kecil tidak valid.");
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: business, error: businessError } = await supabase.from("business").select("id").limit(1).single();
+  if (businessError || !business) throw new Error("Konfigurasi bisnis tidak ditemukan.");
+
+  const { error } = await supabase.from("system_settings").upsert(
+    {
+      business_id: business.id,
+      key: KEY_PETTY_CASH_DEFAULT_AMOUNT,
+      value,
+      description: "Nominal default (saran awal) Kas Kecil Harian saat dibuka Owner/Admin di halaman Kasir.",
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "business_id,key" }
+  );
+  if (error) {
+    throw new Error(`Gagal menyimpan nominal default Kas Kecil (hanya Super Admin yang boleh mengubah ini): ${error.message}`);
+  }
 }
 
 export async function setBusinessLocation(latitude: number | null, longitude: number | null) {

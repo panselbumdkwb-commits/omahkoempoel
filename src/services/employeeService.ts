@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export type EmployeeInput = {
   employeeCode: string;
@@ -13,6 +14,14 @@ export type EmployeeInput = {
   employmentType?: "tetap" | "casual";
   /** Upah per hari (Rp) — hanya dipakai kalau employmentType = 'casual'. */
   dailyRate?: number;
+  // --- Data pribadi (opsional, bisa dilengkapi belakangan lewat Edit) ---
+  email?: string;
+  birthDate?: string | null;
+  gender?: "L" | "P" | null;
+  idNumber?: string;
+  address?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 };
 
 /** Daftar pegawai. Secara default hanya yang belum dihapus (soft-delete
@@ -25,7 +34,7 @@ export async function listEmployees(params?: { positionId?: string | null }) {
   let query = supabase
     .from("employees")
     .select(
-      "id, employee_code, full_name, phone, position_id, basic_salary, employment_type, daily_rate, status, join_date, employee_positions(name)"
+      "id, employee_code, full_name, phone, position_id, basic_salary, employment_type, daily_rate, status, join_date, photo_path, email, birth_date, gender, id_number, address, emergency_contact_name, emergency_contact_phone, employee_positions(name)"
     )
     .is("deleted_at", null)
     .order("full_name");
@@ -34,7 +43,17 @@ export async function listEmployees(params?: { positionId?: string | null }) {
   }
   const { data, error } = await query;
   if (error) throw new Error(`Gagal memuat data pegawai: ${error.message}`);
-  return data ?? [];
+
+  // Ubah photo_path (path privat di bucket employee-photos) jadi signed URL
+  // berumur pendek supaya foto bisa dirender <img> di halaman Pegawai
+  // tanpa membuat bucket-nya publik (data pribadi/wajah pegawai).
+  const withPhotoUrls = await Promise.all(
+    (data ?? []).map(async (emp: any) => ({
+      ...emp,
+      photo_url: emp.photo_path ? await getEmployeePhotoUrl(emp.photo_path) : null,
+    }))
+  );
+  return withPhotoUrls;
 }
 
 /** Daftar jabatan beserta acuan gaji pokok bulanannya (default_basic_salary).
@@ -48,6 +67,50 @@ export async function listPositions() {
     .order("name");
   if (error) throw new Error(`Gagal memuat jabatan: ${error.message}`);
   return data ?? [];
+}
+
+/** Buat signed URL berumur pendek (1 jam) untuk 1 foto pegawai/absensi di
+ * bucket privat employee-photos. Dipakai supabaseAdmin (service role)
+ * supaya bisa jalan baik dari halaman admin (sesi staf) maupun dari
+ * konteks tanpa sesi (mis. tidak dipakai untuk kiosk, tapi tetap aman
+ * dipusatkan di satu tempat). Bucket sengaja PRIVAT (bukan public seperti
+ * bucket products) karena berisi data pribadi/wajah pegawai. */
+export async function getEmployeePhotoUrl(photoPath: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.storage
+    .from("employee-photos")
+    .createSignedUrl(photoPath, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+/**
+ * Upload foto profil pegawai (bukan foto absensi) ke bucket privat
+ * employee-photos, lalu simpan PATH-nya (bukan URL) ke employees.photo_path.
+ * Memakai sesi staf yang login (bukan admin client) supaya storage policy
+ * "employee_photos_admin_insert" (migration 0023, khusus SUPER_ADMIN/OWNER)
+ * benar-benar menguji role user yang login — konsisten dengan pola
+ * uploadProductImage di catalogService.ts.
+ */
+export async function uploadEmployeePhoto(employeeId: string, file: File) {
+  const supabase = createSupabaseServerClient();
+
+  const maxSizeBytes = 3 * 1024 * 1024; // 3MB
+  if (file.size > maxSizeBytes) throw new Error("Ukuran foto maksimal 3MB.");
+  if (!file.type.startsWith("image/")) throw new Error("File harus berupa gambar.");
+
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${employeeId}/profile-${Date.now()}.${ext}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const { error: uploadError } = await supabase.storage
+    .from("employee-photos")
+    .upload(path, arrayBuffer, { contentType: file.type, upsert: true });
+  if (uploadError) throw new Error(`Gagal upload foto pegawai: ${uploadError.message}`);
+
+  const { error: updateError } = await supabase.from("employees").update({ photo_path: path }).eq("id", employeeId);
+  if (updateError) throw new Error(`Gagal menyimpan foto pegawai: ${updateError.message}`);
+
+  return getEmployeePhotoUrl(path);
 }
 
 export async function createPosition(name: string, defaultBasicSalary: number = 0) {
@@ -97,6 +160,13 @@ export async function createEmployee(input: EmployeeInput) {
     employment_type: employmentType,
     daily_rate: dailyRate,
     join_date: input.joinDate ?? new Date().toISOString().slice(0, 10),
+    email: input.email ?? null,
+    birth_date: input.birthDate ?? null,
+    gender: input.gender ?? null,
+    id_number: input.idNumber ?? null,
+    address: input.address ?? null,
+    emergency_contact_name: input.emergencyContactName ?? null,
+    emergency_contact_phone: input.emergencyContactPhone ?? null,
   });
   if (error) throw new Error(`Gagal menambah pegawai: ${error.message}`);
 }
@@ -111,6 +181,13 @@ export async function updateEmployee(
     basicSalary: number;
     employmentType: "tetap" | "casual";
     dailyRate: number;
+    email: string;
+    birthDate: string | null;
+    gender: "L" | "P" | null;
+    idNumber: string;
+    address: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
   }>
 ) {
   const supabase = createSupabaseServerClient();
@@ -133,6 +210,13 @@ export async function updateEmployee(
       ...(updates.basicSalary !== undefined && { basic_salary: updates.basicSalary }),
       ...(updates.employmentType !== undefined && { employment_type: updates.employmentType }),
       ...(updates.dailyRate !== undefined && { daily_rate: updates.dailyRate }),
+      ...(updates.email !== undefined && { email: updates.email }),
+      ...(updates.birthDate !== undefined && { birth_date: updates.birthDate }),
+      ...(updates.gender !== undefined && { gender: updates.gender }),
+      ...(updates.idNumber !== undefined && { id_number: updates.idNumber }),
+      ...(updates.address !== undefined && { address: updates.address }),
+      ...(updates.emergencyContactName !== undefined && { emergency_contact_name: updates.emergencyContactName }),
+      ...(updates.emergencyContactPhone !== undefined && { emergency_contact_phone: updates.emergencyContactPhone }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -191,10 +275,23 @@ export async function listAttendanceByDate(date: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("attendance")
-    .select("id, employee_id, clock_in, clock_out, status, notes, late_minutes, employees(full_name, employee_code)")
+    .select(
+      "id, employee_id, clock_in, clock_out, status, notes, late_minutes, clock_in_photo_path, clock_out_photo_path, employees(full_name, employee_code)"
+    )
     .eq("attendance_date", date);
   if (error) throw new Error(`Gagal memuat absensi: ${error.message}`);
-  return data ?? [];
+
+  // Sama seperti listEmployees: ubah path privat jadi signed URL supaya
+  // Admin/Owner bisa lihat foto absensi untuk verifikasi MANUAL (bukan
+  // pencocokan wajah otomatis/AI — lihat komentar migration 0023).
+  const withPhotoUrls = await Promise.all(
+    (data ?? []).map(async (row: any) => ({
+      ...row,
+      clock_in_photo_url: row.clock_in_photo_path ? await getEmployeePhotoUrl(row.clock_in_photo_path) : null,
+      clock_out_photo_url: row.clock_out_photo_path ? await getEmployeePhotoUrl(row.clock_out_photo_path) : null,
+    }))
+  );
+  return withPhotoUrls;
 }
 
 /** Ringkasan absensi utk rentang tanggal (dipakai halaman Jadwal Shift

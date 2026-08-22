@@ -22,6 +22,35 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Unggah foto selfie absensi (base64 data URL dari kamera HP) ke bucket
+ * privat employee-photos. Sama seperti kioskService.ts — HANYA untuk
+ * verifikasi MANUAL oleh Admin/Owner, bukan pencocokan wajah otomatis.
+ */
+async function uploadAttendanceSelfie(
+  employeeId: string,
+  photoDataUrl: string,
+  moment: "in" | "out"
+): Promise<string | null> {
+  try {
+    const match = /^data:(image\/\w+);base64,(.+)$/.exec(photoDataUrl);
+    if (!match) return null;
+    const [, mimeType, base64] = match;
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.byteLength > 2 * 1024 * 1024) return null;
+
+    const ext = mimeType.split("/")[1] ?? "jpg";
+    const path = `${employeeId}/attendance-${moment}-${Date.now()}.${ext}`;
+    const { error } = await supabaseAdmin.storage
+      .from("employee-photos")
+      .upload(path, buffer, { contentType: mimeType, upsert: true });
+    if (error) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 /** Pegawai yang sudah terverifikasi (attendance_pin_hash terisi) —
  * dipakai di dropdown halaman absen mandiri lewat HP pribadi. */
 export async function listVerifiedMobileEmployees() {
@@ -45,7 +74,8 @@ export async function mobileClockAttendance(
   employeeId: string,
   pin: string,
   action: "in" | "out",
-  location: { lat: number; lng: number }
+  location: { lat: number; lng: number },
+  photoDataUrl?: string | null
 ) {
   const { data: employee, error: empError } = await supabaseAdmin
     .from("employees")
@@ -78,6 +108,7 @@ export async function mobileClockAttendance(
 
   const today = todayJakartaDateString();
   const now = new Date().toISOString();
+  const photoPath = photoDataUrl ? await uploadAttendanceSelfie(employeeId, photoDataUrl, action) : null;
 
   if (action === "in") {
     const { data: existing } = await supabaseAdmin
@@ -98,6 +129,7 @@ export async function mobileClockAttendance(
         source: "mobile",
         clock_in_lat: location.lat,
         clock_in_lng: location.lng,
+        ...(photoPath && { clock_in_photo_path: photoPath }),
       },
       { onConflict: "employee_id,attendance_date" }
     );
@@ -115,7 +147,12 @@ export async function mobileClockAttendance(
 
     const { error } = await supabaseAdmin
       .from("attendance")
-      .update({ clock_out: now, clock_out_lat: location.lat, clock_out_lng: location.lng })
+      .update({
+        clock_out: now,
+        clock_out_lat: location.lat,
+        clock_out_lng: location.lng,
+        ...(photoPath && { clock_out_photo_path: photoPath }),
+      })
       .eq("id", existing.id);
     if (error) throw new Error(`Gagal mencatat absen pulang: ${error.message}`);
     return { message: `Absen pulang tercatat: ${employee.full_name}`, time: now };
