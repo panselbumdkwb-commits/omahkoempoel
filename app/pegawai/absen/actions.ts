@@ -11,9 +11,10 @@ export async function mobileClockAction(
   pin: string,
   action: "in" | "out",
   lat: number,
-  lng: number
+  lng: number,
+  photoDataUrl?: string | null
 ) {
-  return mobileAttendanceService.mobileClockAttendance(employeeId, pin, action, { lat, lng });
+  return mobileAttendanceService.mobileClockAttendance(employeeId, pin, action, { lat, lng }, photoDataUrl);
 }
 
 export async function submitLeaveAction(employeeId: string, pin: string, reason: string) {

@@ -12,6 +12,8 @@ import {
   type KedaiProfile,
   getBusinessLocation,
   setBusinessLocation,
+  getPettyCashDefaultAmount,
+  setPettyCashDefaultAmount,
 } from "@/services/settingsService";
 
 export async function getShowDateTimeClockAction() {
@@ -52,4 +54,12 @@ export async function getBusinessLocationAction() {
 
 export async function setBusinessLocationAction(latitude: number | null, longitude: number | null) {
   await setBusinessLocation(latitude, longitude);
+}
+
+export async function getPettyCashDefaultAmountAction() {
+  return getPettyCashDefaultAmount();
+}
+
+export async function setPettyCashDefaultAmountAction(value: number) {
+  await setPettyCashDefaultAmount(value);
 }

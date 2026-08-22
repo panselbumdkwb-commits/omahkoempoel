@@ -7,6 +7,7 @@ import {
   setEmployeeWorkHoursAction,
   setKedaiProfileAction,
   setBusinessLocationAction,
+  setPettyCashDefaultAmountAction,
 } from "./actions";
 import DateTimeBadge from "@/components/DateTimeBadge";
 
@@ -26,6 +27,7 @@ export default function SettingsClient({
   initialEmployeeWorkHours,
   initialKedaiProfile,
   initialBusinessLocation,
+  initialPettyCashDefaultAmount,
 }: {
   role: string | null;
   initialShowDateTimeClock: boolean;
@@ -33,6 +35,7 @@ export default function SettingsClient({
   initialEmployeeWorkHours: string;
   initialKedaiProfile: KedaiProfile;
   initialBusinessLocation: { latitude: number | null; longitude: number | null };
+  initialPettyCashDefaultAmount: number;
 }) {
   const [showClock, setShowClock] = useState(initialShowDateTimeClock);
   const [isPending, startTransition] = useTransition();
@@ -51,6 +54,10 @@ export default function SettingsClient({
   const [kedaiSaved, setKedaiSaved] = useState(initialKedaiProfile);
   const [kedaiStatus, setKedaiStatus] = useState<string | null>(null);
   const kedaiDirty = JSON.stringify(kedai) !== JSON.stringify(kedaiSaved);
+
+  const [pettyCashDefault, setPettyCashDefault] = useState(String(initialPettyCashDefaultAmount));
+  const [pettyCashDefaultSaved, setPettyCashDefaultSaved] = useState(String(initialPettyCashDefaultAmount));
+  const [pettyCashStatus, setPettyCashStatus] = useState<string | null>(null);
 
   const [lat, setLat] = useState(initialBusinessLocation.latitude?.toString() ?? "");
   const [lng, setLng] = useState(initialBusinessLocation.longitude?.toString() ?? "");
@@ -86,6 +93,24 @@ export default function SettingsClient({
         setLocStatus("Tersimpan.");
       } catch (err: any) {
         setLocStatus(err.message ?? "Gagal menyimpan.");
+      }
+    });
+  }
+
+  function savePettyCashDefault() {
+    setPettyCashStatus(null);
+    const num = Number(pettyCashDefault);
+    if (!Number.isFinite(num) || num < 0) {
+      setPettyCashStatus("Nominal tidak valid.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await setPettyCashDefaultAmountAction(num);
+        setPettyCashDefaultSaved(pettyCashDefault);
+        setPettyCashStatus("Tersimpan.");
+      } catch (err: any) {
+        setPettyCashStatus(err.message ?? "Gagal menyimpan.");
       }
     });
   }
@@ -231,6 +256,39 @@ export default function SettingsClient({
           </button>
         </div>
         {workHoursStatus && <p className="text-sm text-text-muted mt-2">{workHoursStatus}</p>}
+        {!canEdit && (
+          <p className="text-xs text-text-muted mt-2">Hanya Super Admin yang dapat mengubah ini.</p>
+        )}
+      </section>
+
+      {/* KAS KECIL HARIAN — nominal default saat dibuka di halaman Kasir */}
+      <section className="rounded-md border border-border bg-surface dark:bg-surface-dark p-5">
+        <p className="font-semibold mb-1">Kas Kecil Harian — Nominal Default</p>
+        <p className="text-sm text-text-muted mb-3">
+          Saran nominal awal yang muncul saat Owner/Admin membuka Kas Kecil Harian di halaman Kasir.
+          Ini hanya nilai bawaan (bisa diubah lagi saat membuka) — nominal aktual tiap hari tetap
+          ditentukan oleh Owner/Admin saat itu juga.
+        </p>
+        <div className="flex gap-2 items-center">
+          <span className="text-sm text-text-muted">Rp</span>
+          <input
+            type="number"
+            min={0}
+            step="1000"
+            value={pettyCashDefault}
+            onChange={(e) => setPettyCashDefault(e.target.value)}
+            disabled={!canEdit}
+            className="flex-1 border border-border rounded-md p-2 bg-background dark:bg-background-dark disabled:opacity-60"
+          />
+          <button
+            onClick={savePettyCashDefault}
+            disabled={!canEdit || isPending || pettyCashDefault === pettyCashDefaultSaved}
+            className="px-4 rounded-md bg-primary text-white text-sm font-semibold disabled:opacity-50"
+          >
+            Simpan
+          </button>
+        </div>
+        {pettyCashStatus && <p className="text-sm text-text-muted mt-2">{pettyCashStatus}</p>}
         {!canEdit && (
           <p className="text-xs text-text-muted mt-2">Hanya Super Admin yang dapat mengubah ini.</p>
         )}

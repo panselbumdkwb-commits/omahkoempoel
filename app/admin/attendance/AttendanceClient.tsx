@@ -12,6 +12,8 @@ type AttendanceRow = {
   status: string;
   notes: string | null;
   late_minutes?: number | null;
+  clock_in_photo_url?: string | null;
+  clock_out_photo_url?: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -226,6 +228,7 @@ export default function AttendanceClient({
                       {existing?.clock_out ? existing.clock_out.slice(11, 16) : "-"}
                     </span>
                   )}
+                  <AttendancePhotoLinks row={existing} />
                 </div>
               </div>
             );
@@ -276,13 +279,39 @@ export default function AttendanceClient({
                 placeholder="Menit Telat"
                 className="border border-border rounded-lg p-1.5 text-sm bg-background dark:bg-background-dark"
               />
-              <button type="submit" disabled={isPending} className="btn-primary-modern py-1.5 text-xs">
-                Simpan
-              </button>
+              <div className="flex items-center gap-2">
+                <AttendancePhotoLinks row={existing} />
+                <button type="submit" disabled={isPending} className="btn-primary-modern py-1.5 text-xs">
+                  Simpan
+                </button>
+              </div>
             </form>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Thumbnail foto selfie absen masuk/pulang — untuk verifikasi MANUAL oleh
+ * Admin/Owner (klik untuk buka ukuran penuh di tab baru). BUKAN pencocokan
+ * wajah otomatis; sistem ini tidak membandingkan foto ke mana pun.
+ */
+function AttendancePhotoLinks({ row }: { row: AttendanceRow | undefined }) {
+  if (!row?.clock_in_photo_url && !row?.clock_out_photo_url) return null;
+  return (
+    <div className="flex gap-1 shrink-0" title="Foto absensi (verifikasi manual)">
+      {row.clock_in_photo_url && (
+        <a href={row.clock_in_photo_url} target="_blank" rel="noopener noreferrer" title="Foto absen masuk">
+          <img src={row.clock_in_photo_url} alt="Foto absen masuk" className="w-7 h-7 rounded-md object-cover border border-border" />
+        </a>
+      )}
+      {row.clock_out_photo_url && (
+        <a href={row.clock_out_photo_url} target="_blank" rel="noopener noreferrer" title="Foto absen pulang">
+          <img src={row.clock_out_photo_url} alt="Foto absen pulang" className="w-7 h-7 rounded-md object-cover border border-border" />
+        </a>
+      )}
     </div>
   );
 }

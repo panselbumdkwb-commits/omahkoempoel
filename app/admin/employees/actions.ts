@@ -32,6 +32,13 @@ export async function createEmployeeAction(formData: FormData) {
   const basicSalary = Number(formData.get("basicSalary") ?? 0);
   const employmentType = String(formData.get("employmentType") ?? "tetap") as "tetap" | "casual";
   const dailyRate = Number(formData.get("dailyRate") ?? 0);
+  const email = String(formData.get("email") ?? "").trim();
+  const birthDate = String(formData.get("birthDate") ?? "").trim();
+  const gender = String(formData.get("gender") ?? "").trim();
+  const idNumber = String(formData.get("idNumber") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const emergencyContactName = String(formData.get("emergencyContactName") ?? "").trim();
+  const emergencyContactPhone = String(formData.get("emergencyContactPhone") ?? "").trim();
 
   if (!employeeCode || !fullName) throw new Error("Kode pegawai dan nama wajib diisi.");
 
@@ -43,6 +50,13 @@ export async function createEmployeeAction(formData: FormData) {
     basicSalary,
     employmentType,
     dailyRate,
+    email: email || undefined,
+    birthDate: birthDate || null,
+    gender: gender === "L" || gender === "P" ? gender : null,
+    idNumber: idNumber || undefined,
+    address: address || undefined,
+    emergencyContactName: emergencyContactName || undefined,
+    emergencyContactPhone: emergencyContactPhone || undefined,
   });
   revalidatePath("/admin/employees");
 }
@@ -56,6 +70,13 @@ export async function updateEmployeeAction(formData: FormData) {
   const basicSalary = Number(formData.get("basicSalary") ?? 0);
   const employmentType = String(formData.get("employmentType") ?? "tetap") as "tetap" | "casual";
   const dailyRate = Number(formData.get("dailyRate") ?? 0);
+  const email = String(formData.get("email") ?? "").trim();
+  const birthDate = String(formData.get("birthDate") ?? "").trim();
+  const gender = String(formData.get("gender") ?? "").trim();
+  const idNumber = String(formData.get("idNumber") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const emergencyContactName = String(formData.get("emergencyContactName") ?? "").trim();
+  const emergencyContactPhone = String(formData.get("emergencyContactPhone") ?? "").trim();
 
   if (!id) throw new Error("ID pegawai tidak valid.");
   if (!employeeCode) throw new Error("Kode pegawai wajib diisi.");
@@ -67,7 +88,25 @@ export async function updateEmployeeAction(formData: FormData) {
     basicSalary,
     employmentType,
     dailyRate,
+    email,
+    birthDate: birthDate || null,
+    gender: gender === "L" || gender === "P" ? gender : null,
+    idNumber,
+    address,
+    emergencyContactName,
+    emergencyContactPhone,
   });
+  revalidatePath("/admin/employees");
+}
+
+/** Upload/ganti foto profil pegawai — hanya SUPER_ADMIN/OWNER (ditegakkan
+ * RLS storage bucket employee-photos, migration 0023). */
+export async function uploadEmployeePhotoAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const file = formData.get("photo") as File | null;
+  if (!id) throw new Error("ID pegawai tidak valid.");
+  if (!file || file.size === 0) throw new Error("Pilih file foto dulu.");
+  await employeeService.uploadEmployeePhoto(id, file);
   revalidatePath("/admin/employees");
 }
 

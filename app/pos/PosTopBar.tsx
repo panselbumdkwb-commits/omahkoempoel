@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-browser";
 import DateTimeBadge from "@/components/DateTimeBadge";
+import PettyCashWidget from "./PettyCashWidget";
 
 export default function PosTopBar({
   showDateTimeClock,
@@ -39,9 +40,12 @@ export default function PosTopBar({
       {showDateTimeClock && (
         <DateTimeBadge variant="compact" className="text-sm text-text-muted hidden sm:inline" />
       )}
-      <button onClick={handleLogout} className="text-sm text-danger font-semibold">
-        Logout
-      </button>
+      <div className="flex items-center gap-3">
+        <PettyCashWidget role={role} />
+        <button onClick={handleLogout} className="text-sm text-danger font-semibold">
+          Logout
+        </button>
+      </div>
     </header>
   );
 }

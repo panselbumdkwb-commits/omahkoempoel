@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { mobileClockAction, submitLeaveAction } from "./actions";
+import CameraCapture from "@/components/CameraCapture";
 
 type Employee = { id: string; full_name: string };
 
@@ -14,6 +15,7 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [cameraFor, setCameraFor] = useState<"in" | "out" | null>(null);
 
   function getLocation(): Promise<GeolocationPosition> {
     return new Promise((resolve, reject) => {
@@ -28,7 +30,7 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
     });
   }
 
-  function clock(action: "in" | "out") {
+  function clock(action: "in" | "out", photoDataUrl?: string | null) {
     if (!employeeId) {
       setResult({ ok: false, text: "Pilih nama kamu dulu." });
       return;
@@ -37,12 +39,13 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
       setResult({ ok: false, text: "Masukkan PIN kamu." });
       return;
     }
+    setCameraFor(null);
     setResult(null);
     setLocating(true);
     startTransition(async () => {
       try {
         const pos = await getLocation();
-        const res = await mobileClockAction(employeeId, pin, action, pos.coords.latitude, pos.coords.longitude);
+        const res = await mobileClockAction(employeeId, pin, action, pos.coords.latitude, pos.coords.longitude, photoDataUrl ?? null);
         setResult({ ok: true, text: res.message });
         setPin("");
       } catch (err: any) {
@@ -134,10 +137,10 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
                 Absen masuk hanya bisa dilakukan dalam radius 10 meter dari Kedai — pastikan GPS aktif.
               </p>
               <div className="flex gap-2">
-                <button onClick={() => clock("in")} disabled={isPending} className="flex-1 bg-success text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
+                <button onClick={() => (employeeId && pin ? setCameraFor("in") : clock("in"))} disabled={isPending} className="flex-1 bg-success text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
                   {locating && isPending ? "Mengambil lokasi..." : "Absen Masuk"}
                 </button>
-                <button onClick={() => clock("out")} disabled={isPending} className="flex-1 bg-accent text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
+                <button onClick={() => (employeeId && pin ? setCameraFor("out") : clock("out"))} disabled={isPending} className="flex-1 bg-accent text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
                   Absen Pulang
                 </button>
               </div>
@@ -160,6 +163,14 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
           )}
         </div>
       </div>
+
+      {cameraFor && (
+        <CameraCapture
+          title={cameraFor === "in" ? "Foto Absen Masuk" : "Foto Absen Pulang"}
+          onCapture={(dataUrl) => clock(cameraFor, dataUrl)}
+          onSkip={() => clock(cameraFor, null)}
+        />
+      )}
     </main>
   );
 }

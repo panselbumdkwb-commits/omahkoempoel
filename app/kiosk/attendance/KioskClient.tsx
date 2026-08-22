@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { kioskClockAction, getTodayScheduleAction } from "./actions";
 import DateTimeBadge from "@/components/DateTimeBadge";
+import CameraCapture from "@/components/CameraCapture";
 
 type Employee = { id: string; full_name: string | null; employee_code: string };
 type TodaySchedule = { shift_start: string | null; shift_end: string | null; is_off: boolean } | null;
@@ -19,6 +20,7 @@ export default function KioskClient({
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [todaySchedule, setTodaySchedule] = useState<TodaySchedule>(null);
+  const [cameraFor, setCameraFor] = useState<"in" | "out" | null>(null);
 
   useEffect(() => {
     if (!selected) {
@@ -38,11 +40,12 @@ export default function KioskClient({
     setPin(pin + d);
   }
 
-  function submit(action: "in" | "out") {
+  function submit(action: "in" | "out", photoDataUrl?: string | null) {
     if (!selected || pin.length < 4) return;
+    setCameraFor(null);
     startTransition(async () => {
       try {
-        const res = await kioskClockAction(selected.id, pin, action);
+        const res = await kioskClockAction(selected.id, pin, action, photoDataUrl ?? null);
         setResult({ ok: true, message: res.message });
       } catch (err: any) {
         setResult({ ok: false, message: err.message });
@@ -172,20 +175,28 @@ export default function KioskClient({
 
       <div className="flex gap-4 w-full max-w-xs">
         <button
-          onClick={() => submit("in")}
+          onClick={() => setCameraFor("in")}
           disabled={pin.length < 4 || isPending}
           className="flex-1 bg-success text-white py-4 rounded-xl font-bold disabled:opacity-40"
         >
           Absen Masuk
         </button>
         <button
-          onClick={() => submit("out")}
+          onClick={() => setCameraFor("out")}
           disabled={pin.length < 4 || isPending}
           className="flex-1 bg-sogan text-white py-4 rounded-xl font-bold disabled:opacity-40"
         >
           Absen Pulang
         </button>
       </div>
+
+      {cameraFor && (
+        <CameraCapture
+          title={cameraFor === "in" ? "Foto Absen Masuk" : "Foto Absen Pulang"}
+          onCapture={(dataUrl) => submit(cameraFor, dataUrl)}
+          onSkip={() => submit(cameraFor, null)}
+        />
+      )}
     </main>
   );
 }

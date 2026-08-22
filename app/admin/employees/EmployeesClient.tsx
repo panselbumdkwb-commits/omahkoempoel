@@ -8,6 +8,7 @@ import {
   toggleEmployeeStatusAction,
   setEmployeePinAction,
   deleteEmployeeAction,
+  uploadEmployeePhotoAction,
 } from "./actions";
 
 type Position = { id: string; name: string; default_basic_salary: number };
@@ -22,6 +23,14 @@ type Employee = {
   daily_rate: number;
   status: string;
   join_date: string;
+  photo_url: string | null;
+  email: string | null;
+  birth_date: string | null;
+  gender: "L" | "P" | null;
+  id_number: string | null;
+  address: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   employee_positions: { name: string } | { name: string }[] | null;
 };
 
@@ -54,6 +63,7 @@ export default function EmployeesClient({
   const isCaptain = role === "CAPTAIN";
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pinEditId, setPinEditId] = useState<string | null>(null);
+  const [photoEditId, setPhotoEditId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [filterPositionId, setFilterPositionId] = useState<string>("");
@@ -275,6 +285,56 @@ export default function EmployeesClient({
                     className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
                     placeholder="Upah harian (khusus Casual)"
                   />
+                  <div className="col-span-2 border-t border-border pt-2 mt-1">
+                    <p className="text-xs font-semibold text-text-muted mb-1">Data Pribadi (opsional)</p>
+                  </div>
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={e.email ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="Email"
+                  />
+                  <input
+                    name="birthDate"
+                    type="date"
+                    defaultValue={e.birth_date ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="Tanggal lahir"
+                  />
+                  <select
+                    name="gender"
+                    defaultValue={e.gender ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                  >
+                    <option value="">Jenis Kelamin</option>
+                    <option value="L">Laki-laki</option>
+                    <option value="P">Perempuan</option>
+                  </select>
+                  <input
+                    name="idNumber"
+                    defaultValue={e.id_number ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="NIK / No. KTP"
+                  />
+                  <input
+                    name="address"
+                    defaultValue={e.address ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2"
+                    placeholder="Alamat"
+                  />
+                  <input
+                    name="emergencyContactName"
+                    defaultValue={e.emergency_contact_name ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="Nama Kontak Darurat"
+                  />
+                  <input
+                    name="emergencyContactPhone"
+                    defaultValue={e.emergency_contact_phone ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
+                    placeholder="No. HP Kontak Darurat"
+                  />
                   <div className="col-span-2 flex gap-2">
                     <button
                       type="submit"
@@ -294,27 +354,46 @@ export default function EmployeesClient({
                 </form>
               ) : (
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">
-                      {e.full_name} <span className="text-xs text-text-muted">({e.employee_code})</span>
-                      {e.status !== "active" && <span className="ml-2 text-xs text-danger">{e.status}</span>}
-                      {e.employment_type === "casual" && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-batik-gold/20 text-batik-gold font-semibold">
-                          Casual
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-text-muted text-sm">
-                      {positionName(e)} ·{" "}
-                      {e.employment_type === "casual"
-                        ? `${formatRupiah(e.daily_rate)}/hari`
-                        : `${formatRupiah(e.basic_salary)}/bulan`}{" "}
-                      · {e.phone || "-"}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    {e.photo_url ? (
+                      <img
+                        src={e.photo_url}
+                        alt={e.full_name ?? "Foto pegawai"}
+                        className="w-11 h-11 rounded-full object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-background dark:bg-background-dark border border-border flex items-center justify-center text-xs text-text-muted">
+                        {(e.full_name ?? "?").slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold">
+                        {e.full_name} <span className="text-xs text-text-muted">({e.employee_code})</span>
+                        {e.status !== "active" && <span className="ml-2 text-xs text-danger">{e.status}</span>}
+                        {e.employment_type === "casual" && (
+                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-batik-gold/20 text-batik-gold font-semibold">
+                            Casual
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-text-muted text-sm">
+                        {positionName(e)} ·{" "}
+                        {e.employment_type === "casual"
+                          ? `${formatRupiah(e.daily_rate)}/hari`
+                          : `${formatRupiah(e.basic_salary)}/bulan`}{" "}
+                        · {e.phone || "-"}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setEditingId(e.id)} className="text-sm px-3 py-1.5 rounded-md border border-border">
                       Edit
+                    </button>
+                    <button
+                      onClick={() => setPhotoEditId(photoEditId === e.id ? null : e.id)}
+                      className="text-sm px-3 py-1.5 rounded-md border border-border"
+                    >
+                      Foto
                     </button>
                     <button
                       onClick={() => setPinEditId(pinEditId === e.id ? null : e.id)}
@@ -342,6 +421,24 @@ export default function EmployeesClient({
                     </button>
                   </div>
                 </div>
+              )}
+              {photoEditId === e.id && (
+                <form
+                  action={(fd) => handleAction(() => uploadEmployeePhotoAction(fd), `Foto ${e.full_name} diperbarui.`)}
+                  className="mt-2 flex gap-2 items-center"
+                >
+                  <input type="hidden" name="id" value={e.id} />
+                  <input
+                    name="photo"
+                    type="file"
+                    accept="image/*"
+                    required
+                    className="text-sm flex-1 border border-border rounded-md p-1.5 bg-background dark:bg-background-dark"
+                  />
+                  <button type="submit" disabled={isPending} className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50">
+                    Unggah
+                  </button>
+                </form>
               )}
               {pinEditId === e.id && (
                 <form
@@ -423,6 +520,20 @@ export default function EmployeesClient({
             required={newEmploymentType === "casual"}
             className="border border-border rounded-md p-2 bg-background dark:bg-background-dark"
           />
+          <div className="col-span-2 border-t border-border pt-2 mt-1">
+            <p className="text-xs font-semibold text-text-muted mb-1">Data Pribadi (opsional, bisa dilengkapi belakangan lewat Edit)</p>
+          </div>
+          <input name="email" type="email" placeholder="Email" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
+          <input name="birthDate" type="date" placeholder="Tanggal lahir" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
+          <select name="gender" defaultValue="" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark">
+            <option value="">Jenis Kelamin</option>
+            <option value="L">Laki-laki</option>
+            <option value="P">Perempuan</option>
+          </select>
+          <input name="idNumber" placeholder="NIK / No. KTP" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
+          <input name="address" placeholder="Alamat" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark col-span-2" />
+          <input name="emergencyContactName" placeholder="Nama Kontak Darurat" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
+          <input name="emergencyContactPhone" placeholder="No. HP Kontak Darurat" className="border border-border rounded-md p-2 bg-background dark:bg-background-dark" />
           <button
             type="submit"
             disabled={isPending}
@@ -431,6 +542,10 @@ export default function EmployeesClient({
             Tambah Pegawai
           </button>
         </form>
+        <p className="text-xs text-text-muted mt-2">
+          Setelah pegawai ditambahkan, unggah foto profilnya lewat tombol <span className="font-semibold">Foto</span> di
+          daftar pegawai di atas — dipakai juga sebagai referensi identitas untuk verifikasi manual foto absensi.
+        </p>
         <p className="text-xs text-text-muted mt-2">
           Pegawai <span className="font-semibold">Casual</span> adalah pengganti sementara untuk
           pegawai tetap yang tidak masuk — diupah harian (Upah Harian x jumlah hari hadir di periode

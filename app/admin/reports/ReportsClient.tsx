@@ -14,6 +14,17 @@ import { getSalesReportAction, getFinancialStatementAction } from "./actions";
 import type { SalesReport, FinancialStatement } from "@/services/reportService";
 import { formatJakartaDateTime } from "@/lib/timezone";
 import { extractInclusiveTax } from "@/lib/tax";
+import OperationalExpensesPanel from "./OperationalExpensesPanel";
+
+type Expense = {
+  id: string;
+  name: string;
+  category: "utility" | "social" | "other";
+  calc_type: "fixed" | "percent_of_revenue" | "variable_manual";
+  expense_type: "operational" | "non_operational";
+  value: number;
+  is_active: boolean;
+};
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 
@@ -97,11 +108,13 @@ export default function ReportsClient({
   initialFinancials,
   initialStart,
   initialEnd,
+  expenses,
 }: {
   initialReport: SalesReport;
   initialFinancials: FinancialStatement;
   initialStart: string;
   initialEnd: string;
+  expenses: Expense[];
 }) {
   const [report, setReport] = useState<SalesReport>(initialReport);
   const [financials, setFinancials] = useState<FinancialStatement>(initialFinancials);
@@ -630,6 +643,8 @@ export default function ReportsClient({
           </section>
         )}
       </div>
+
+      <OperationalExpensesPanel expenses={expenses} />
     </div>
   );
 }
