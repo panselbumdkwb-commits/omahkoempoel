@@ -138,6 +138,29 @@ export async function updatePositionSalary(id: string, defaultBasicSalary: numbe
   if (error) throw new Error(`Gagal memperbarui gaji pokok jabatan: ${error.message}`);
 }
 
+/**
+ * Hapus jabatan (dari master "Gaji Pokok per Jabatan" di halaman
+ * Payroll/Pegawai) yang sudah tidak dipakai. HARD DELETE — bukan
+ * deleted_at seperti employees — karena employee_positions cuma tabel
+ * master kecil, bukan data transaksi. employees.position_id merujuk ke
+ * tabel ini TANPA on delete cascade, jadi kalau masih ada pegawai
+ * (termasuk yang sudah di-soft-delete) yang pakai jabatan ini, database
+ * akan menolak (FK violation, kode 23503) — pesan error diterjemahkan
+ * jadi instruksi yang jelas, bukan pesan Postgres mentah.
+ */
+export async function deletePosition(id: string) {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from("employee_positions").delete().eq("id", id);
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error(
+        "Jabatan ini masih dipakai oleh pegawai — pindahkan pegawai ke jabatan lain dulu sebelum menghapus."
+      );
+    }
+    throw new Error(`Gagal menghapus jabatan: ${error.message}`);
+  }
+}
+
 export async function createEmployee(input: EmployeeInput) {
   const supabase = createSupabaseServerClient();
   const { data: business } = await supabase.from("business").select("id").limit(1).single();

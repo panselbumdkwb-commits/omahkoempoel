@@ -295,6 +295,27 @@ export async function listPayrollItems(periodId: string) {
   return data ?? [];
 }
 
+/**
+ * Hapus 1 periode payroll (dari "Riwayat Periode Payroll" di halaman
+ * Payroll) yang sudah tidak diperlukan, beserta seluruh slip gaji
+ * (payroll_items) di dalamnya — payroll_items.payroll_period_id
+ * merujuk ke sini TANPA on delete cascade, jadi item-nya harus dihapus
+ * dulu sebelum periode-nya sendiri supaya tidak kena FK violation.
+ * Tidak dibatasi status (DRAFT/APPROVED) — Admin/Owner yang menilai
+ * apakah periode ini masih diperlukan sebagai arsip atau tidak.
+ */
+export async function deletePayrollPeriod(periodId: string) {
+  const supabase = createSupabaseServerClient();
+  const { error: itemsError } = await supabase
+    .from("payroll_items")
+    .delete()
+    .eq("payroll_period_id", periodId);
+  if (itemsError) throw new Error(`Gagal menghapus slip gaji periode ini: ${itemsError.message}`);
+
+  const { error } = await supabase.from("payroll_periods").delete().eq("id", periodId);
+  if (error) throw new Error(`Gagal menghapus periode payroll: ${error.message}`);
+}
+
 export async function approvePayrollPeriod(periodId: string) {
   const supabase = createSupabaseServerClient();
   const { error: e1 } = await supabase.from("payroll_periods").update({ status: "APPROVED" }).eq("id", periodId);

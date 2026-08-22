@@ -2,14 +2,30 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+/**
+ * Daftar user beserta email login-nya. Email TIDAK disimpan di tabel
+ * profiles (lihat createUserAccount) — sumber kebenarannya auth.users,
+ * jadi diambil lewat supabaseAdmin.auth.admin.listUsers() lalu
+ * digabung ke tiap baris profil berdasarkan id (profiles.id selalu
+ * sama dengan auth user id). Akun yang sudah dihapus (deleted_at
+ * terisi, lihat deleteUserAccount) tidak ikut ditampilkan.
+ */
 export async function listUsers() {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, phone, status, created_at, roles(code, name)")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Gagal memuat daftar user: ${error.message}`);
-  return data ?? [];
+
+  const { data: authList, error: authError } = await supabaseAdmin.auth.admin.listUsers({
+    perPage: 200,
+  });
+  if (authError) throw new Error(`Gagal memuat email user: ${authError.message}`);
+  const emailById = new Map(authList.users.map((u) => [u.id, u.email ?? ""]));
+
+  return (data ?? []).map((u) => ({ ...u, email: emailById.get(u.id) ?? "" }));
 }
 
 export async function listRoles() {
@@ -112,4 +128,53 @@ export async function setUserStatus(profileId: string, status: "active" | "suspe
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("profiles").update({ status }).eq("id", profileId);
   if (error) throw new Error(`Gagal mengubah status user: ${error.message}`);
+}
+
+/**
+ * Edit email login user (Kelola User). Butuh supabaseAdmin karena
+ * mengubah email di Supabase Auth bukan operasi yang bisa lewat client
+ * biasa. email_confirm: true supaya email baru langsung aktif dipakai
+ * login tanpa perlu verifikasi lewat tautan email (akun staf internal,
+ * bukan pendaftaran publik).
+ */
+export async function updateUserEmail(profileId: string, newEmail: string) {
+  const email = newEmail.trim();
+  if (!email) throw new Error("Email tidak boleh kosong.");
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(profileId, {
+    email,
+    email_confirm: true,
+  });
+  if (error) throw new Error(`Gagal mengubah email: ${error.message}`);
+}
+
+/**
+ * Hapus akun staf yang sudah tidak dipakai dari Kelola User.
+ *
+ * Dipakai SOFT DELETE (profiles.deleted_at) — bukan hard delete row
+ * profiles — karena employees.profile_id masih boleh mereferensikan
+ * profil ini untuk riwayat pegawai/payroll/absensi (hard delete akan
+ * gagal kena FK constraint kalau profil ini pernah dipakai, atau
+ * merusak riwayat kalau berhasil). Supabase Auth user juga di-ban
+ * permanen (bukan cuma profiles.status='suspended') supaya akun ini
+ * BENAR-BENAR tidak bisa login lagi — sign-in Supabase Auth tidak
+ * mengecek profiles.status sama sekali, jadi kalau tidak di-ban,
+ * kredensial lama tetap bisa dipakai login walau sudah "dihapus".
+ */
+export async function deleteUserAccount(profileId: string, currentUserId: string | null) {
+  if (currentUserId && profileId === currentUserId) {
+    throw new Error("Tidak bisa menghapus akun yang sedang Anda pakai untuk login.");
+  }
+
+  const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(profileId, {
+    ban_duration: "876000h", // ~100 tahun, efektif permanen
+  });
+  if (banError) throw new Error(`Gagal menonaktifkan akun: ${banError.message}`);
+
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ deleted_at: new Date().toISOString(), status: "suspended" })
+    .eq("id", profileId);
+  if (error) throw new Error(`Gagal menghapus akun: ${error.message}`);
 }
