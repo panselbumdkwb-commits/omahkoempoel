@@ -54,6 +54,23 @@ export async function updatePositionSalaryAction(formData: FormData) {
   revalidatePath("/admin/employees");
 }
 
+/** Hapus 1 jabatan dari "Gaji Pokok per Jabatan" — ditolak lewat
+ * employeeService.deletePosition kalau masih dipakai pegawai aktif. */
+export async function deletePositionAction(id: string) {
+  if (!id) throw new Error("Jabatan tidak valid.");
+  await employeeService.deletePosition(id);
+  revalidatePath("/admin/payroll");
+  revalidatePath("/admin/employees");
+}
+
+/** Hapus 1 periode dari "Riwayat Periode Payroll" beserta slip gajinya —
+ * ditolak lewat payrollService.deletePayrollPeriod kalau sudah PAID. */
+export async function deletePayrollPeriodAction(id: string) {
+  if (!id) throw new Error("Periode tidak valid.");
+  await payrollService.deletePayrollPeriod(id);
+  revalidatePath("/admin/payroll");
+}
+
 // ----------------------------------------------------------
 // BIAYA OPERASIONAL BULANAN (Listrik, Air, Internet, Kebersihan,
 // Cadangan Kebutuhan Sosial, dst — lihat operationalExpenseService)
