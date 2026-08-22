@@ -62,3 +62,22 @@ export async function toggleUserStatusAction(profileId: string, currentStatus: s
   await userService.setUserStatus(profileId, next as "active" | "suspended");
   revalidatePath("/admin/users");
 }
+
+/** Ubah email login dari modal "Edit" di Kelola User (login pakai
+ * email, bukan username). */
+export async function updateUserEmailAction(formData: FormData) {
+  await requireSuperAdmin();
+  const profileId = String(formData.get("profileId") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
+  if (!profileId || !email) throw new Error("Email wajib diisi.");
+  await userService.updateUserEmail(profileId, email);
+  revalidatePath("/admin/users");
+}
+
+/** Hapus akun yang sudah tidak dipakai dari Kelola User. */
+export async function deleteUserAction(profileId: string) {
+  await requireSuperAdmin();
+  if (!profileId) throw new Error("Akun tidak valid.");
+  await userService.deleteUserAccount(profileId);
+  revalidatePath("/admin/users");
+}
