@@ -1,0 +1,18 @@
+{
+  "name": "Absen Mandiri — Omah Koempoel",
+  "short_name": "Absen Koempoel",
+  "description": "Absensi mandiri pegawai Kedai Omah Koempoel lewat HP — absen masuk/pulang dengan foto & lokasi, ajukan izin.",
+  "start_url": "/pegawai/absen",
+  "scope": "/pegawai/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#3E2723",
+  "theme_color": "#3E2723",
+  "lang": "id",
+  "icons": [
+    { "src": "/icons/absen-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/absen-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/absen-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/absen-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
