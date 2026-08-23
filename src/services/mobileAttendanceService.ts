@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { verifyPin } from "@/lib/pin";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { getJakartaTodayRange } from "@/lib/timezone";
 
 const GEOFENCE_RADIUS_METERS = 10;
@@ -51,17 +51,51 @@ async function uploadAttendanceSelfie(
   }
 }
 
-/** Pegawai yang sudah terverifikasi (attendance_pin_hash terisi) —
- * dipakai di dropdown halaman absen mandiri lewat HP pribadi. */
-export async function listVerifiedMobileEmployees() {
-  const { data, error } = await supabaseAdmin
+/**
+ * Login Absen Mandiri lewat HP pribadi — verifikasi username +
+ * password (dibuat Admin/Captain saat verifikasi pendaftaran, lihat
+ * employeeService.setEmployeeMobileLogin). Sesi login dibuat terpisah
+ * lewat createMobileSession() di actions.ts pemanggil (butuh konteks
+ * Server Action untuk bisa set cookie).
+ */
+export async function loginMobile(username: string, password: string) {
+  if (!username.trim() || !password) throw new Error("Username dan password wajib diisi.");
+
+  const { data: employee, error } = await supabaseAdmin
     .from("employees")
-    .select("id, full_name")
-    .eq("status", "active")
-    .not("attendance_pin_hash", "is", null)
-    .order("full_name");
-  if (error) throw new Error("Gagal memuat daftar pegawai.");
-  return data ?? [];
+    .select("id, full_name, mobile_password_hash, status")
+    .ilike("mobile_username", username.trim())
+    .maybeSingle();
+  if (error) throw new Error("Gagal memeriksa login.");
+  if (!employee || employee.status !== "active" || !employee.mobile_password_hash) {
+    throw new Error("Username atau password salah.");
+  }
+  if (!verifyPassword(password, employee.mobile_password_hash)) {
+    throw new Error("Username atau password salah.");
+  }
+  return { id: employee.id, full_name: employee.full_name };
+}
+
+/** Ganti password sendiri dari /pegawai/akun — WAJIB pegawai tahu
+ * password lama-nya (beda dengan "Reset Login HP" oleh Admin yang
+ * tidak butuh password lama, untuk kasus lupa password). */
+export async function changeMobilePassword(employeeId: string, currentPassword: string, newPassword: string) {
+  if (newPassword.length < 8) throw new Error("Password baru minimal 8 karakter.");
+
+  const { data: employee } = await supabaseAdmin
+    .from("employees")
+    .select("mobile_password_hash")
+    .eq("id", employeeId)
+    .single();
+  if (!employee || !verifyPassword(currentPassword, employee.mobile_password_hash)) {
+    throw new Error("Password lama salah.");
+  }
+
+  const { error } = await supabaseAdmin
+    .from("employees")
+    .update({ mobile_password_hash: hashPassword(newPassword) })
+    .eq("id", employeeId);
+  if (error) throw new Error(`Gagal mengganti password: ${error.message}`);
 }
 
 /**
@@ -69,27 +103,26 @@ export async function listVerifiedMobileEmployees() {
  * radius 10 meter dari lokasi Kedai (business.latitude/longitude,
  * diisi Super Admin di halaman Pengaturan) — beda dengan kios yang
  * tidak butuh cek lokasi karena perangkatnya memang sudah di Kedai.
+ *
+ * employeeId di sini SUDAH terverifikasi lewat sesi login
+ * (requireMobileSession() di page.tsx pemanggil) — tidak ada lagi
+ * parameter PIN, karena identitas pegawai sekarang dibuktikan lewat
+ * login username+password sekali di awal, bukan diketik ulang tiap
+ * absen (lihat migration 0024).
  */
 export async function mobileClockAttendance(
   employeeId: string,
-  pin: string,
   action: "in" | "out",
   location: { lat: number; lng: number },
   photoDataUrl?: string | null
 ) {
   const { data: employee, error: empError } = await supabaseAdmin
     .from("employees")
-    .select("id, full_name, attendance_pin_hash, business_id, status")
+    .select("id, full_name, business_id, status")
     .eq("id", employeeId)
     .single();
   if (empError || !employee) throw new Error("Pegawai tidak ditemukan.");
   if (employee.status !== "active") throw new Error("Akun pegawai ini tidak aktif.");
-  if (!employee.attendance_pin_hash) {
-    throw new Error("Akun belum terverifikasi. Selesaikan pendaftaran & tunggu verifikasi Captain/Admin/Owner.");
-  }
-  if (!verifyPin(pin, employee.attendance_pin_hash)) {
-    throw new Error("PIN salah.");
-  }
 
   const { data: business } = await supabaseAdmin
     .from("business")
@@ -160,20 +193,17 @@ export async function mobileClockAttendance(
 }
 
 /** Pengajuan izin/tidak masuk — boleh dilakukan dari mana saja (TIDAK
- * ada validasi lokasi), berbeda dengan absen masuk. */
-export async function submitLeaveRequest(employeeId: string, pin: string, reason: string) {
+ * ada validasi lokasi), berbeda dengan absen masuk. employeeId sudah
+ * terverifikasi lewat sesi login, sama seperti mobileClockAttendance. */
+export async function submitLeaveRequest(employeeId: string, reason: string) {
   if (!reason.trim()) throw new Error("Alasan izin wajib diisi.");
   const { data: employee, error: empError } = await supabaseAdmin
     .from("employees")
-    .select("id, full_name, attendance_pin_hash, business_id, status")
+    .select("id, full_name, business_id, status")
     .eq("id", employeeId)
     .single();
   if (empError || !employee) throw new Error("Pegawai tidak ditemukan.");
   if (employee.status !== "active") throw new Error("Akun pegawai ini tidak aktif.");
-  if (!employee.attendance_pin_hash) {
-    throw new Error("Akun belum terverifikasi. Selesaikan pendaftaran & tunggu verifikasi Captain/Admin/Owner.");
-  }
-  if (!verifyPin(pin, employee.attendance_pin_hash)) throw new Error("PIN salah.");
 
   const today = todayJakartaDateString();
   const { data: existing } = await supabaseAdmin

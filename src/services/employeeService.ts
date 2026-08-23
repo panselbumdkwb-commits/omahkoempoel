@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { hashPassword } from "@/lib/password";
 
 export type EmployeeInput = {
   employeeCode: string;
@@ -34,7 +35,7 @@ export async function listEmployees(params?: { positionId?: string | null }) {
   let query = supabase
     .from("employees")
     .select(
-      "id, employee_code, full_name, phone, position_id, basic_salary, employment_type, daily_rate, status, join_date, photo_path, email, birth_date, gender, id_number, address, emergency_contact_name, emergency_contact_phone, employee_positions(name)"
+      "id, employee_code, full_name, phone, position_id, basic_salary, employment_type, daily_rate, status, join_date, photo_path, email, birth_date, gender, id_number, address, emergency_contact_name, emergency_contact_phone, mobile_username, employee_positions(name)"
     )
     .is("deleted_at", null)
     .order("full_name");
@@ -288,6 +289,55 @@ export async function setEmployeePin(id: string, pin: string) {
     .update({ attendance_pin_hash: hashPin(pin) })
     .eq("id", id);
   if (error) throw new Error(`Gagal mengatur PIN: ${error.message}`);
+}
+
+/**
+ * Buat/reset kredensial login Absen Mandiri (HP pribadi) untuk 1
+ * pegawai — dipanggil saat verifikasi pendaftaran mandiri (lihat
+ * employeeRegistrationService.verifyRegistrationRequest) ATAU lewat
+ * tombol "Reset Login HP" di halaman Pegawai kalau pegawai lupa
+ * password / ganti HP. TERPISAH dari setEmployeePin (PIN tetap dipakai
+ * untuk kios/perangkat bersama) — lihat migration 0024. Mencabut SEMUA
+ * sesi HP yang sedang aktif milik pegawai ini supaya reset benar-benar
+ * mengunci akses lama (penting untuk kasus HP hilang / pegawai keluar).
+ */
+export async function setEmployeeMobileLogin(id: string, username: string, password: string) {
+  const trimmedUsername = username.trim();
+  if (!/^[a-z0-9._-]{3,32}$/i.test(trimmedUsername)) {
+    throw new Error("Username 3-32 karakter: huruf, angka, titik, underscore, atau strip saja.");
+  }
+  if (password.length < 8) {
+    throw new Error("Password minimal 8 karakter.");
+  }
+
+  const supabase = createSupabaseServerClient();
+
+  const { data: employee } = await supabase.from("employees").select("business_id").eq("id", id).single();
+  if (!employee) throw new Error("Pegawai tidak ditemukan.");
+
+  const { data: taken } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("business_id", employee.business_id)
+    .ilike("mobile_username", trimmedUsername)
+    .neq("id", id)
+    .maybeSingle();
+  if (taken) throw new Error("Username sudah dipakai pegawai lain — pilih username lain.");
+
+  const { error } = await supabase
+    .from("employees")
+    .update({ mobile_username: trimmedUsername, mobile_password_hash: hashPassword(password) })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Username sudah dipakai pegawai lain — pilih username lain.");
+    }
+    throw new Error(`Gagal menyimpan login HP: ${error.message}`);
+  }
+
+  // employee_mobile_sessions cuma bisa diakses lewat supabaseAdmin —
+  // RLS-nya sengaja tidak membuka akses apa pun (lihat migration 0024).
+  await supabaseAdmin.from("employee_mobile_sessions").delete().eq("employee_id", id);
 }
 
 // ---------------------------------------------------------------

@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { hashPin } from "@/lib/pin";
+import { setEmployeeMobileLogin } from "@/services/employeeService";
 
 /**
  * Pendaftaran akun absensi mandiri oleh pegawai lewat HP pribadi.
@@ -61,8 +62,20 @@ export async function listUnlinkedActiveEmployees() {
 
 /** Verifikasi: tautkan pendaftaran ke pegawai yang sudah ada di data
  * master (ditambahkan sebelumnya oleh Admin/Owner/Captain di halaman
- * Pegawai) & buatkan PIN absensi mandiri untuknya. */
-export async function verifyRegistrationRequest(requestId: string, employeeId: string, pin: string) {
+ * Pegawai), buatkan PIN absensi kios, DAN kredensial login Absen
+ * Mandiri (username + password) untuk HP pribadi pegawai — dua-duanya
+ * dibuat sekaligus di sini karena inilah momen Admin/Captain pertama
+ * kali menyerahkan akses ke pegawai baru (lihat migration 0024).
+ * Username & password sementara ditampilkan sekali ke Admin (lewat
+ * actions.ts) untuk diteruskan ke pegawai lewat WhatsApp — pegawai
+ * WAJIB menggantinya sendiri lewat /pegawai/akun setelah login pertama. */
+export async function verifyRegistrationRequest(
+  requestId: string,
+  employeeId: string,
+  pin: string,
+  mobileUsername: string,
+  mobilePassword: string
+) {
   if (!/^\d{4,8}$/.test(pin)) throw new Error("PIN harus 4-8 digit angka.");
   const supabase = createSupabaseServerClient();
   const {
@@ -75,6 +88,8 @@ export async function verifyRegistrationRequest(requestId: string, employeeId: s
     .update({ attendance_pin_hash: hashPin(pin) })
     .eq("id", employeeId);
   if (pinError) throw new Error(`Gagal membuat PIN pegawai: ${pinError.message}`);
+
+  await setEmployeeMobileLogin(employeeId, mobileUsername, mobilePassword);
 
   const { error } = await supabase
     .from("employee_registration_requests")
