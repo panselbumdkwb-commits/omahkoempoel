@@ -132,6 +132,19 @@ export async function setEmployeePinAction(formData: FormData) {
   await employeeService.setEmployeePin(id, pin);
   revalidatePath("/admin/employees");
 }
+
+/** Buat/reset username + password login Absen Mandiri (HP pribadi) —
+ * dipakai kalau pegawai lupa password, ganti HP, atau HP-nya hilang
+ * (reset ini juga mencabut semua sesi lama, lihat
+ * employeeService.setEmployeeMobileLogin). */
+export async function setEmployeeMobileLoginAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const username = String(formData.get("mobileUsername") ?? "");
+  const password = String(formData.get("mobilePassword") ?? "");
+  if (!id) throw new Error("ID pegawai tidak valid.");
+  await employeeService.setEmployeeMobileLogin(id, username, password);
+  revalidatePath("/admin/employees");
+}
 export async function recordAttendanceAction(formData: FormData) {
   const employeeId = String(formData.get("employeeId") ?? "");
   const date = String(formData.get("date") ?? "");

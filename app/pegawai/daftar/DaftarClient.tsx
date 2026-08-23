@@ -32,10 +32,10 @@ export default function DaftarClient() {
             <p className="text-4xl">✅</p>
             <p className="font-semibold text-wood-dark">Pendaftaran terkirim!</p>
             <p className="text-sm text-wood-mid">
-              Tunggu verifikasi dari Captain/Admin/Owner. Setelah disetujui, kamu akan diberi PIN
-              absensi untuk absen lewat halaman{" "}
-              <Link href="/pegawai/absen" className="underline font-semibold">
-                Absen Mandiri
+              Tunggu verifikasi dari Captain/Admin/Owner. Setelah disetujui, kamu akan diberi
+              username &amp; password untuk login di halaman{" "}
+              <Link href="/pegawai/login" className="underline font-semibold">
+                Login Absen Mandiri
               </Link>
               .
             </p>
@@ -63,9 +63,9 @@ export default function DaftarClient() {
               {isPending ? "Mengirim..." : "Daftar"}
             </button>
             <p className="text-xs text-wood-mid text-center pt-2">
-              Sudah punya PIN?{" "}
-              <Link href="/pegawai/absen" className="underline font-semibold">
-                Absen Mandiri
+              Sudah punya akun?{" "}
+              <Link href="/pegawai/login" className="underline font-semibold">
+                Login di sini
               </Link>
             </p>
           </form>

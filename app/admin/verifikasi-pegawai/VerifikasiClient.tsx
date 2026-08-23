@@ -14,6 +14,25 @@ type Request = {
 };
 type Candidate = { id: string; employee_code: string; full_name: string };
 
+function generatePassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+/** Saran username dari nama lengkap (huruf/angka saja, lowercase,
+ * dipisah titik) — Admin tetap bebas mengubahnya sebelum submit,
+ * cuma titik awal supaya tidak perlu mengetik dari nol. */
+function suggestUsername(fullName: string) {
+  return fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .join(".");
+}
+
 export default function VerifikasiClient({
   initialRequests,
   candidates,
@@ -24,6 +43,7 @@ export default function VerifikasiClient({
   const [requests, setRequests] = useState(initialRequests);
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [genPassword, setGenPassword] = useState(generatePassword());
   const [isPending, startTransition] = useTransition();
 
   function verify(fd: FormData) {
@@ -33,7 +53,12 @@ export default function VerifikasiClient({
         const requestId = String(fd.get("requestId"));
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
         setOpenFor(null);
-        setMessage("Pendaftaran diverifikasi & PIN pegawai dibuat.");
+        setMessage(
+          `Pendaftaran diverifikasi. PIN kios dibuat. Login Absen Mandiri — Username: ${fd.get(
+            "mobileUsername"
+          )}, Password: ${fd.get("mobilePassword")} (catat sekarang & teruskan ke pegawai lewat WhatsApp, tidak ditampilkan lagi).`
+        );
+        setGenPassword(generatePassword());
       } catch (err: any) {
         setMessage(`Gagal: ${err.message}`);
       }
@@ -56,8 +81,11 @@ export default function VerifikasiClient({
         <p className="text-sm text-text-muted mt-1">
           Pegawai mendaftar sendiri lewat{" "}
           <span className="font-semibold">/pegawai/daftar</span> di HP pribadinya. Tautkan ke data
-          pegawai yang sudah ada di menu Pegawai, lalu buatkan PIN — pegawai baru bisa absen mandiri
-          lewat <span className="font-semibold">/pegawai/absen</span> setelah ini.
+          pegawai yang sudah ada di menu Pegawai, lalu buatkan PIN kios & login Absen Mandiri
+          (username + password sementara) — teruskan username/password ke pegawai lewat WhatsApp;
+          pegawai wajib login sekali di{" "}
+          <span className="font-semibold">/pegawai/login</span> dan bisa ganti password sendiri
+          lewat <span className="font-semibold">/pegawai/akun</span> setelah itu.
         </p>
       </div>
 
@@ -112,12 +140,34 @@ export default function VerifikasiClient({
                     type="text"
                     inputMode="numeric"
                     name="pin"
-                    placeholder="Buat PIN (4-8 digit)"
+                    placeholder="PIN kios (4-8 digit)"
                     required
                     minLength={4}
                     maxLength={8}
                     pattern="\d{4,8}"
                     className="border border-border rounded-lg p-2 text-sm bg-background dark:bg-background-dark col-span-2"
+                  />
+                  <p className="col-span-2 text-xs text-text-muted -mb-1">
+                    Login Absen Mandiri (HP pribadi) — terpisah dari PIN kios di atas:
+                  </p>
+                  <input
+                    type="text"
+                    name="mobileUsername"
+                    placeholder="Username"
+                    required
+                    minLength={3}
+                    maxLength={32}
+                    defaultValue={suggestUsername(r.full_name)}
+                    className="border border-border rounded-lg p-2 text-sm bg-background dark:bg-background-dark col-span-2 sm:col-span-1"
+                  />
+                  <input
+                    type="text"
+                    name="mobilePassword"
+                    placeholder="Password sementara"
+                    required
+                    minLength={8}
+                    defaultValue={genPassword}
+                    className="border border-border rounded-lg p-2 text-sm bg-background dark:bg-background-dark col-span-2 sm:col-span-1"
                   />
                   <button type="submit" disabled={isPending} className="btn-primary-modern col-span-2">
                     Setujui &amp; Buat PIN

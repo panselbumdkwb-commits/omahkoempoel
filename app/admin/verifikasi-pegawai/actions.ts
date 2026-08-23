@@ -15,7 +15,15 @@ export async function verifyRegistrationRequestAction(formData: FormData) {
   const requestId = String(formData.get("requestId") ?? "");
   const employeeId = String(formData.get("employeeId") ?? "");
   const pin = String(formData.get("pin") ?? "");
-  await employeeRegistrationService.verifyRegistrationRequest(requestId, employeeId, pin);
+  const mobileUsername = String(formData.get("mobileUsername") ?? "");
+  const mobilePassword = String(formData.get("mobilePassword") ?? "");
+  await employeeRegistrationService.verifyRegistrationRequest(
+    requestId,
+    employeeId,
+    pin,
+    mobileUsername,
+    mobilePassword
+  );
   revalidatePath("/admin/verifikasi-pegawai");
 }
 

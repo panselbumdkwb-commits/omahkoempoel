@@ -7,10 +7,8 @@ import CameraCapture from "@/components/CameraCapture";
 
 type Employee = { id: string; full_name: string };
 
-export default function AbsenClient({ employees }: { employees: Employee[] }) {
+export default function AbsenClient({ employee }: { employee: Employee }) {
   const [mode, setMode] = useState<"hadir" | "izin">("hadir");
-  const [employeeId, setEmployeeId] = useState("");
-  const [pin, setPin] = useState("");
   const [reason, setReason] = useState("");
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -60,23 +58,14 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
   }
 
   function clock(action: "in" | "out", photoDataUrl?: string | null) {
-    if (!employeeId) {
-      setResult({ ok: false, text: "Pilih nama kamu dulu." });
-      return;
-    }
-    if (!pin) {
-      setResult({ ok: false, text: "Masukkan PIN kamu." });
-      return;
-    }
     setCameraFor(null);
     setResult(null);
     setLocating(true);
     startTransition(async () => {
       try {
         const pos = await getLocation();
-        const res = await mobileClockAction(employeeId, pin, action, pos.coords.latitude, pos.coords.longitude, photoDataUrl ?? null);
+        const res = await mobileClockAction(action, pos.coords.latitude, pos.coords.longitude, photoDataUrl ?? null);
         setResult({ ok: true, text: res.message });
-        setPin("");
       } catch (err: any) {
         setResult({ ok: false, text: err.message ?? "Gagal absen." });
       } finally {
@@ -86,20 +75,11 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
   }
 
   function submitLeave() {
-    if (!employeeId) {
-      setResult({ ok: false, text: "Pilih nama kamu dulu." });
-      return;
-    }
-    if (!pin) {
-      setResult({ ok: false, text: "Masukkan PIN kamu." });
-      return;
-    }
     setResult(null);
     startTransition(async () => {
       try {
-        const res = await submitLeaveAction(employeeId, pin, reason);
+        const res = await submitLeaveAction(reason);
         setResult({ ok: true, text: res.message });
-        setPin("");
         setReason("");
       } catch (err: any) {
         setResult({ ok: false, text: err.message ?? "Gagal mengajukan izin." });
@@ -111,7 +91,8 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
     <main className="min-h-screen bg-wood-dark flex items-center justify-center p-6">
       <div className="w-full max-w-sm bg-parchment rounded-2xl shadow-xl p-6">
         <h1 className="font-ukir text-2xl text-wood-dark mb-1 text-center">Absen Mandiri</h1>
-        <p className="text-sm text-wood-mid text-center mb-4">Kedai Omah Koempoel — lewat HP pribadi</p>
+        <p className="text-sm text-wood-mid text-center mb-1">Kedai Omah Koempoel — lewat HP pribadi</p>
+        <p className="text-sm font-semibold text-wood-dark text-center mb-4">Halo, {employee.full_name} 👋</p>
 
         {!installed && installPrompt && (
           <button
@@ -145,47 +126,16 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
         </div>
 
         <div className="space-y-3">
-          <div>
-            <label className="block text-xs text-wood-mid mb-1">Nama Kamu</label>
-            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="w-full border border-wood-light rounded-lg p-2.5 bg-white">
-              <option value="">Pilih nama</option>
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.full_name}
-                </option>
-              ))}
-            </select>
-            {employees.length === 0 && (
-              <p className="text-xs text-danger mt-1">
-                Belum ada akun terverifikasi.{" "}
-                <Link href="/pegawai/daftar" className="underline font-semibold">
-                  Daftar dulu di sini
-                </Link>
-                .
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs text-wood-mid mb-1">PIN</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              className="w-full border border-wood-light rounded-lg p-2.5 bg-white tracking-widest text-center"
-            />
-          </div>
-
           {mode === "hadir" ? (
             <>
               <p className="text-xs text-wood-mid">
                 Absen masuk hanya bisa dilakukan dalam radius 10 meter dari Kedai — pastikan GPS aktif.
               </p>
               <div className="flex gap-2">
-                <button onClick={() => (employeeId && pin ? setCameraFor("in") : clock("in"))} disabled={isPending} className="flex-1 bg-success text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
+                <button onClick={() => setCameraFor("in")} disabled={isPending} className="flex-1 bg-success text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
                   {locating && isPending ? "Mengambil lokasi..." : "Absen Masuk"}
                 </button>
-                <button onClick={() => (employeeId && pin ? setCameraFor("out") : clock("out"))} disabled={isPending} className="flex-1 bg-accent text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
+                <button onClick={() => setCameraFor("out")} disabled={isPending} className="flex-1 bg-accent text-white font-jakarta font-bold py-3 rounded-lg disabled:opacity-60">
                   Absen Pulang
                 </button>
               </div>
@@ -206,6 +156,12 @@ export default function AbsenClient({ employees }: { employees: Employee[] }) {
           {result && (
             <p className={`text-sm text-center font-semibold ${result.ok ? "text-success" : "text-danger"}`}>{result.text}</p>
           )}
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-wood-light text-center">
+          <Link href="/pegawai/akun" className="text-xs text-wood-mid underline font-semibold">
+            Akun Saya / Ganti Password / Keluar
+          </Link>
         </div>
       </div>
 

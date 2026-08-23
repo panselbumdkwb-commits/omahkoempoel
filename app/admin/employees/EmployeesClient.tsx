@@ -7,6 +7,7 @@ import {
   updateEmployeeAction,
   toggleEmployeeStatusAction,
   setEmployeePinAction,
+  setEmployeeMobileLoginAction,
   deleteEmployeeAction,
   uploadEmployeePhotoAction,
 } from "./actions";
@@ -31,8 +32,16 @@ type Employee = {
   address: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  mobile_username: string | null;
   employee_positions: { name: string } | { name: string }[] | null;
 };
+
+function generatePassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
 
 function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -63,6 +72,8 @@ export default function EmployeesClient({
   const isCaptain = role === "CAPTAIN";
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pinEditId, setPinEditId] = useState<string | null>(null);
+  const [mobileLoginEditId, setMobileLoginEditId] = useState<string | null>(null);
+  const [genPassword, setGenPassword] = useState(generatePassword());
   const [photoEditId, setPhotoEditId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -78,6 +89,23 @@ export default function EmployeesClient({
         await action();
         setMessage(successMsg);
         setEditingId(null);
+      } catch (err: any) {
+        setMessage(`Gagal: ${err.message}`);
+      }
+    });
+  }
+
+  function handleSetMobileLogin(fd: FormData) {
+    startTransition(async () => {
+      try {
+        await setEmployeeMobileLoginAction(fd);
+        setMessage(
+          `Login HP tersimpan. Username: ${fd.get("mobileUsername")}, Password: ${fd.get(
+            "mobilePassword"
+          )} (catat sekarang & teruskan ke pegawai lewat WhatsApp, tidak ditampilkan lagi). Sesi lama di HP lain otomatis keluar.`
+        );
+        setMobileLoginEditId(null);
+        setGenPassword(generatePassword());
       } catch (err: any) {
         setMessage(`Gagal: ${err.message}`);
       }
@@ -383,6 +411,14 @@ export default function EmployeesClient({
                           : `${formatRupiah(e.basic_salary)}/bulan`}{" "}
                         · {e.phone || "-"}
                       </p>
+                      <p className="text-xs text-text-muted">
+                        Login HP:{" "}
+                        {e.mobile_username ? (
+                          <span className="font-semibold">{e.mobile_username}</span>
+                        ) : (
+                          <span className="italic">belum dibuat</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -400,6 +436,15 @@ export default function EmployeesClient({
                       className="text-sm px-3 py-1.5 rounded-md border border-border"
                     >
                       Atur PIN
+                    </button>
+                    <button
+                      onClick={() => {
+                        setGenPassword(generatePassword());
+                        setMobileLoginEditId(mobileLoginEditId === e.id ? null : e.id);
+                      }}
+                      className="text-sm px-3 py-1.5 rounded-md border border-border"
+                    >
+                      {e.mobile_username ? "Reset Login HP" : "Buat Login HP"}
                     </button>
                     <button
                       onClick={() =>
@@ -458,6 +503,37 @@ export default function EmployeesClient({
                   <button type="submit" disabled={isPending} className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50">
                     Simpan PIN
                   </button>
+                </form>
+              )}
+              {mobileLoginEditId === e.id && (
+                <form action={handleSetMobileLogin} className="mt-2 flex flex-wrap gap-2 items-center">
+                  <input type="hidden" name="id" value={e.id} />
+                  <input
+                    name="mobileUsername"
+                    type="text"
+                    placeholder="Username"
+                    required
+                    minLength={3}
+                    maxLength={32}
+                    defaultValue={e.mobile_username ?? ""}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                  />
+                  <input
+                    name="mobilePassword"
+                    type="text"
+                    placeholder="Password sementara"
+                    required
+                    minLength={8}
+                    defaultValue={genPassword}
+                    className="border border-border rounded-md p-2 bg-background dark:bg-background-dark text-sm"
+                  />
+                  <button type="submit" disabled={isPending} className="text-sm px-3 py-1.5 rounded-md bg-primary text-white font-semibold disabled:opacity-50">
+                    Simpan Login HP
+                  </button>
+                  <p className="text-xs text-text-muted w-full">
+                    Untuk login Absen Mandiri di /pegawai/login (beda dari PIN kios di atas). Menyimpan ini akan
+                    mengeluarkan sesi HP lama pegawai ini kalau ada.
+                  </p>
                 </form>
               )}
             </div>

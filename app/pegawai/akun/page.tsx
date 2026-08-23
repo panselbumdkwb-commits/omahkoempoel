@@ -1,9 +1,9 @@
 import { requireMobileSession } from "@/lib/mobileSession";
-import AbsenClient from "./AbsenClient";
+import AkunClient from "./AkunClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function AbsenMandiriPage() {
+export default async function AkunPegawaiPage() {
   const employee = await requireMobileSession();
-  return <AbsenClient employee={employee} />;
+  return <AkunClient fullName={employee.full_name} />;
 }
